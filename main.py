@@ -3,8 +3,11 @@ import time
 import warnings
 import logging
 
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=ResourceWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 logging.getLogger("urllib3").setLevel(logging.ERROR)
+logging.getLogger("google").setLevel(logging.ERROR)
 
 # Zork
 from domains.zork.env import ZorkSOTAEnvironment
@@ -58,8 +61,7 @@ def run_zork_interactive(level):
         fresh_env = ZorkSOTAEnvironment(level=level)
         for a in winning_actions:
             print(f" > USER: {a}")
-            sem = parser.parse(a)
-            # We skip parser formatting and pass string directly for true Jericho
+            # Execute the action string directly on the Frotz engine
             obs = fresh_env.step_raw(a)
             print(f" > ZORK: {obs}")
             time.sleep(0.5) # Slight pause for interactive feel

@@ -41,7 +41,7 @@ A deep-horizon symbolic reasoning agent executing the authentic [Infocom Zork 1 
 
 ## Quick Start & Setup 🚀
 
-The project relies on very light dependencies (`numpy`/`scipy` for math, `jericho` for Zork, `spacy` for NLP).
+The project relies on extremely light dependencies (`numpy`/`scipy` for math, `jericho` for Zork). All NLP and spatial reasoning is handled by custom symbolic engines to ensure transparency and performance.
 
 ```bash
 # 1. Clone the repository
@@ -54,7 +54,6 @@ source venv/bin/activate
 
 # 3. Install requirements
 pip install -r requirements.txt
-python -m spacy download en_core_web_sm
 
 # 4. Clone Official ARC Dataset
 git clone https://github.com/fchollet/ARC-AGI.git data/ARC-AGI

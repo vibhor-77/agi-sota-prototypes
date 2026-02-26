@@ -2,7 +2,6 @@ from collections import deque
 import heapq
 import pickle
 from core.exploration import SearchAlgorithm
-from domains.zork.semantics import ZorkSemanticParser
 
 class ZorkDeepAgent(SearchAlgorithm):
     """
@@ -12,7 +11,6 @@ class ZorkDeepAgent(SearchAlgorithm):
     def __init__(self):
         self.world_graph = {}
         self.known_states = set()
-        self.parser = ZorkSemanticParser()
         
     def _hash_state(self, obs, inventory):
         inv_str = ",".join(sorted(inventory))

@@ -4,8 +4,8 @@ from core.abstraction import StateRepresentation
 class ZorkSemanticParser(StateRepresentation):
     """
     Pillar 3: Abstraction.
-    Translates raw text into a structured semantic JSON.
-    Mimics an LLM doing Few-Shot Entity Extraction.
+    Translates raw text into structured semantic JSON using lightweight symbolic matching.
+    Designed to be minimal and dependency-free (avoids heavy NLP libraries like Spacy/LLMs).
     """
     def parse(self, text_cmd: str):
         text = text_cmd.lower()
