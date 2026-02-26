@@ -1,8 +1,9 @@
 import multiprocessing
+import random
 import warnings
 from functools import partial
 from core.exploration import SearchAlgorithm
-from domains.arc.dsl import ARCGrammar
+from domains.arc.dsl import ARCGrammar, mutate_program, crossover
 from domains.arc.heuristics import PixelEditDistance
 
 # Suppress pervasive ResourceWarnings from multiprocessing cleanup on some Python versions
@@ -24,9 +25,8 @@ import concurrent.futures
 class ARCBeamSearch(SearchAlgorithm):
     """
     Pillar 4: Exploration.
-    Systematically traverses the compositional program space using a Heuristic guide
-    to converge on highly complex target tasks without brute-forcing exponential trees.
-    Now utilizes Multi-Core Processing to aggressively evaluate deep DSL trees in parallel.
+    Evolutionary program synthesis using mutation, crossover, and heuristic-guided beam search.
+    Traverses the compositional program space to converge on target tasks.
     """
     def __init__(self):
         self.grammar = ARCGrammar()
@@ -39,23 +39,16 @@ class ARCBeamSearch(SearchAlgorithm):
 
     def _evaluate_batch(self, executor, programs, examples):
         """Evaluates a batch of programs using the provided executor."""
-        # Bind the examples and heuristic to the function
         eval_func = partial(evaluate_single_program, examples=examples, heuristic=self.heuristic)
-        
-        # Static list conversion to force evaluation within the executor's context
         scores = list(executor.map(eval_func, programs))
         return list(zip(scores, programs))
 
     def search(self, start_state, target, beam_width=50, max_generations=20):
-        print(f"[SYNTHESIS] Running Beam Search exploration over program space...")
+        print(f"[SYNTHESIS] Evolutionary Beam Search (beam={beam_width}, gens={max_generations})...")
         
-        # ProcessPoolExecutor is a high-level API that manages worker lifecycles more cleanly than raw Pools
         with concurrent.futures.ProcessPoolExecutor(max_workers=self.cpu_count) as executor:
-            # 1. Random Start Generation
-            candidates = []
-            for _ in range(beam_width * 2):
-                candidates.append(self.grammar.compose('Grid', max_depth=4))
-                
+            # 1. Seed population with random programs
+            candidates = [self.grammar.compose('Grid', max_depth=4) for _ in range(beam_width * 2)]
             beam = self._evaluate_batch(executor, candidates, start_state)
                 
             for gen in range(max_generations):
@@ -63,17 +56,29 @@ class ARCBeamSearch(SearchAlgorithm):
                 beam = beam[:beam_width]
                 
                 if beam[0][0] == 0.0:
-                    print(f"[SYNTHESIS] Concept Converged automatically in generation {gen}")
+                    print(f"[SYNTHESIS] Converged in generation {gen}!")
                     return beam[0][1]
                     
                 if gen % 5 == 0:
-                    print(f"Gen {gen} | Best Heuristic Loss: {beam[0][0]:.3f} | Best Program: {beam[0][1]}")
+                    print(f"Gen {gen} | Best Loss: {beam[0][0]:.3f} | {beam[0][1]}")
                     
-                # 2. Evolutionary Mutations
+                # 2. Evolutionary generation of new candidates
                 new_candidates = []
-                for score, prog in beam:
-                    # Inject diversity
-                    for _ in range(2):
+                top_progs = [prog for _, prog in beam[:max(5, beam_width // 4)]]
+                
+                for _ in range(beam_width):
+                    r = random.random()
+                    if r < 0.5:
+                        # Mutation: tweak a top program
+                        parent = random.choice(top_progs)
+                        new_candidates.append(mutate_program(parent, self.grammar))
+                    elif r < 0.8:
+                        # Crossover: combine two parents
+                        parent_a = random.choice(top_progs)
+                        parent_b = random.choice(top_progs)
+                        new_candidates.append(crossover(parent_a, parent_b))
+                    else:
+                        # Fresh random: maintain diversity
                         new_candidates.append(self.grammar.compose('Grid', max_depth=5))
                         
                 new_evals = self._evaluate_batch(executor, new_candidates, start_state)
@@ -81,3 +86,4 @@ class ARCBeamSearch(SearchAlgorithm):
                 
             beam.sort(key=lambda x: x[0])
             return beam[0][1]
+

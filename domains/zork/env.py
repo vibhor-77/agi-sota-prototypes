@@ -38,6 +38,10 @@ class ZorkSOTAEnvironment(Environment):
     def get_valid_actions(self):
         # Disable parallel validation to prevent leaking multiprocessing pools (improves stability on Mac/Python 3.9)
         return self.env.get_valid_actions(use_parallel=False)
+
+    def get_inventory(self):
+        """Returns list of items currently held by the player."""
+        return self.env.get_inventory()
         
     def step_raw(self, action_string):
         """Immediate execution for BFS loops without semantic parsing overhead"""

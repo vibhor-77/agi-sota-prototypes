@@ -188,6 +188,67 @@ class OverlayNode(ASTNode):
     def evaluate(self, env): return overlay(self.base.evaluate(env), self.top.evaluate(env))
     def __str__(self): return f"overlay({self.base}, {self.top})"
 
+# --- Evolutionary Operators ---
+import copy
+
+# Single-child Grid nodes that can be swapped with each other
+_UNARY_GRID_NODES = [Rotate90Node, MirrorXNode, MirrorYNode, TransposeNode]
+
+def mutate_program(program, grammar):
+    """
+    Mutate an AST program by randomly altering one node.
+    Always operates on a deep copy to prevent shared-reference bugs.
+    """
+    prog = copy.deepcopy(program)
+    r = random.random()
+    
+    # Swap unary grid node type
+    if r < 0.4 and isinstance(prog, tuple(_UNARY_GRID_NODES)):
+        NewType = random.choice(_UNARY_GRID_NODES)
+        return NewType(prog.grid_node)
+    
+    # Re-randomize a color/int child
+    if r < 0.7:
+        if hasattr(prog, 'col') and isinstance(prog.col, ColorNode):
+            prog.col = ColorNode(random.choice([0,1,2,3,4,5,6,7,8,9]))
+            return prog
+        if hasattr(prog, 'c') and isinstance(prog.c, ColorNode):
+            prog.c = ColorNode(random.choice([0,1,2,3,4,5,6,7,8,9]))
+            return prog
+        if hasattr(prog, 'f_col') and isinstance(prog.f_col, ColorNode):
+            prog.f_col = ColorNode(random.choice([0,1,2,3,4,5,6,7,8,9]))
+            return prog
+        if hasattr(prog, 't_col') and isinstance(prog.t_col, ColorNode):
+            prog.t_col = ColorNode(random.choice([0,1,2,3,4,5,6,7,8,9]))
+            return prog
+    
+    # Replace entire subtree with fresh random
+    return grammar.compose('Grid', max_depth=4)
+
+def crossover(parent_a, parent_b):
+    """
+    Combine two parent programs by inserting parent_b's grid subtree into parent_a.
+    Uses deep copies to prevent circular references.
+    """
+    a = copy.deepcopy(parent_a)
+    b = copy.deepcopy(parent_b)
+    
+    children = []
+    if hasattr(a, 'grid_node'): children.append('grid_node')
+    if hasattr(a, 'grid'): children.append('grid')
+    if hasattr(a, 'g'): children.append('g')
+    if hasattr(a, 'base'): children.append('base')
+    if hasattr(a, 'top'): children.append('top')
+    
+    if children:
+        attr_name = random.choice(children)
+        setattr(a, attr_name, b)
+        return a
+    # Fallback: wrap parent_b in a random unary transform
+    Wrapper = random.choice(_UNARY_GRID_NODES)
+    return Wrapper(b)
+
+
 class ARCGrammar(ActionGrammar):
     """
     Pillar 3: Abstraction & Composability.
