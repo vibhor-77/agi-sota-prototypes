@@ -1,0 +1,146 @@
+import numpy as np
+import random
+from scipy.ndimage import label
+from core.abstraction import ActionGrammar
+from domains.arc.env import Grid, ArcObject, BoundingBox
+
+# --- Primitives ---
+def get_objects(grid: Grid) -> list:
+    objects = []
+    colors = np.unique(grid.arr)
+    for c in colors:
+        if c == 0: continue
+        binary_mask = (grid.arr == c).astype(int)
+        labeled_arr, num_features = label(binary_mask)
+        for i in range(1, num_features + 1):
+            obj_mask = (labeled_arr == i)
+            objects.append(ArcObject(obj_mask, c))
+    return objects
+
+def filter_by_color(objects: list, color: int) -> list:
+    return [o for o in objects if o.color == color]
+
+def paint_objects(grid: Grid, objects: list, color: int) -> Grid:
+    new_grid = np.copy(grid.arr)
+    for obj in objects:
+        if obj.mask.shape == new_grid.shape:
+            new_grid[obj.mask] = color
+    return Grid(new_grid)
+
+def rotate90(grid: Grid) -> Grid:
+    return Grid(np.rot90(grid.arr))
+
+def mirror_x(grid: Grid) -> Grid:
+    return Grid(np.flipud(grid.arr))
+
+def mirror_y(grid: Grid) -> Grid:
+    return Grid(np.fliplr(grid.arr))
+
+def get_bounding_box(obj: ArcObject) -> BoundingBox:
+    rows, cols = np.where(obj.mask)
+    if len(rows) == 0: return BoundingBox(0, 0, 0, 0)
+    return BoundingBox(np.min(rows), np.max(rows), np.min(cols), np.max(cols))
+
+def crop_to_box(grid: Grid, box: BoundingBox) -> Grid:
+    if box.r_max < box.r_min or box.c_max < box.c_min:
+        return Grid(np.zeros((1, 1), dtype=int))
+    return Grid(grid.arr[box.r_min:box.r_max+1, box.c_min:box.c_max+1])
+
+# --- Abstract Syntax Tree (Composability) ---
+class ASTNode:
+    def evaluate(self, env): pass
+    def __str__(self): return ""
+    def mutate(self): return self
+
+class IdentityGridNode(ASTNode):
+    def evaluate(self, env): return env['input_grid']
+    def __str__(self): return "input_grid"
+
+class ColorNode(ASTNode):
+    def __init__(self, color_val): self.color_val = color_val
+    def evaluate(self, env): return self.color_val
+    def __str__(self): return f"{self.color_val}"
+    def mutate(self): return ColorNode(random.choice([1, 2, 3]))
+
+class GetObjectsNode(ASTNode):
+    def __init__(self, grid_node): self.grid_node = grid_node
+    def evaluate(self, env): return get_objects(self.grid_node.evaluate(env))
+    def __str__(self): return f"get_objects({self.grid_node})"
+
+class FilterColorNode(ASTNode):
+    def __init__(self, obj_list_node, color_node):
+        self.objs = obj_list_node
+        self.col = color_node
+    def evaluate(self, env): return filter_by_color(self.objs.evaluate(env), self.col.evaluate(env))
+    def __str__(self): return f"filter_by_color({self.objs}, {self.col})"
+
+class PaintNode(ASTNode):
+    def __init__(self, grid_node, obj_list_node, color_node):
+        self.grid = grid_node
+        self.objs = obj_list_node
+        self.col = color_node
+    def evaluate(self, env): return paint_objects(self.grid.evaluate(env), self.objs.evaluate(env), self.col.evaluate(env))
+    def __str__(self): return f"paint({self.grid}, {self.objs}, {self.col})"
+
+class Rotate90Node(ASTNode):
+    def __init__(self, grid_node): self.grid_node = grid_node
+    def evaluate(self, env): return rotate90(self.grid_node.evaluate(env))
+    def __str__(self): return f"rotate90({self.grid_node})"
+
+class MirrorXNode(ASTNode):
+    def __init__(self, grid_node): self.grid_node = grid_node
+    def evaluate(self, env): return mirror_x(self.grid_node.evaluate(env))
+    def __str__(self): return f"mirror_x({self.grid_node})"
+
+class MirrorYNode(ASTNode):
+    def __init__(self, grid_node): self.grid_node = grid_node
+    def evaluate(self, env): return mirror_y(self.grid_node.evaluate(env))
+    def __str__(self): return f"mirror_y({self.grid_node})"
+
+class GetBoundingBoxNode(ASTNode):
+    def __init__(self, obj_list_node): self.objs = obj_list_node
+    def evaluate(self, env):
+        objs = self.objs.evaluate(env)
+        if not objs: return BoundingBox(0,0,0,0)
+        return get_bounding_box(objs[0])
+    def __str__(self): return f"bbox({self.objs}[0])"
+
+class CropToBoxNode(ASTNode):
+    def __init__(self, grid_node, box_node):
+        self.grid = grid_node
+        self.box = box_node
+    def evaluate(self, env): return crop_to_box(self.grid.evaluate(env), self.box.evaluate(env))
+    def __str__(self): return f"crop_to_box({self.grid}, {self.box})"
+
+class ARCGrammar(ActionGrammar):
+    """
+    Pillar 3: Abstraction & Composability.
+    Provides the rules for generating nested functional expressions (Programs).
+    """
+    @property
+    def primitives(self):
+        return [rotate90, mirror_x, mirror_y, get_objects, filter_by_color, crop_to_box, paint_objects]
+        
+    def compose(self, return_type, max_depth=3):
+        return self._generate_typed_program(return_type, max_depth)
+        
+    def _generate_typed_program(self, return_type, max_depth=3):
+        if return_type == 'Grid':
+            if max_depth <= 1:
+                return IdentityGridNode()
+            r = random.random()
+            if r < 0.2: return IdentityGridNode()
+            elif r < 0.4: return Rotate90Node(self._generate_typed_program('Grid', max_depth-1))
+            elif r < 0.5: return MirrorXNode(self._generate_typed_program('Grid', max_depth-1))
+            elif r < 0.6: return MirrorYNode(self._generate_typed_program('Grid', max_depth-1))
+            elif r < 0.8: return CropToBoxNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Box', max_depth-1))
+            else: return PaintNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('ObjectList', max_depth-1), self._generate_typed_program('Color', max_depth-1))
+        elif return_type == 'ObjectList':
+            if max_depth <= 1 or random.random() < 0.5:
+                return GetObjectsNode(self._generate_typed_program('Grid', max_depth-1))
+            else:
+                return FilterColorNode(self._generate_typed_program('ObjectList', max_depth-1), self._generate_typed_program('Color', max_depth-1))
+        elif return_type == 'Color':
+            return ColorNode(random.choice([1, 2, 3]))
+        elif return_type == 'Box':
+            return GetBoundingBoxNode(self._generate_typed_program('ObjectList', max_depth-1))
