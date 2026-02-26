@@ -1,12 +1,8 @@
 import unittest
 import sys
 import os
-import warnings
 from domains.arc.env import ARCEnvironment, generate_2d_arc_task
 from domains.arc.search import ARCBeamSearch
-
-# Suppress ResourceWarnings from multiprocessing cleanup in integration tests
-warnings.filterwarnings("ignore", category=ResourceWarning)
 
 class TestARCEndToEnd(unittest.TestCase):
     def test_arc_sota_level_1(self):

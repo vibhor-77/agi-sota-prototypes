@@ -1,12 +1,8 @@
 import unittest
 import sys
 import os
-import warnings
 from domains.arc.env import Grid
 from domains.arc.search import ARCBeamSearch
-
-# Suppress ResourceWarnings from multiprocessing cleanup in unit tests
-warnings.filterwarnings("ignore", category=ResourceWarning)
 
 class TestARCSearch(unittest.TestCase):
     def test_beam_search_convergence(self):

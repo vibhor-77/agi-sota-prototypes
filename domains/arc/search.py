@@ -19,6 +19,8 @@ def evaluate_single_program(program, examples, heuristic):
             total_dist += 10.0 # Penalty for runtime crashes (bounds, math errors)
     return total_dist / len(examples)
 
+import concurrent.futures
+
 class ARCBeamSearch(SearchAlgorithm):
     """
     Pillar 4: Exploration.
@@ -34,29 +36,27 @@ class ARCBeamSearch(SearchAlgorithm):
     def _evaluate_program(self, program, examples):
         """Helper to evaluate a single program (used by tests)."""
         return evaluate_single_program(program, examples, self.heuristic)
-        
-    def _evaluate_batch(self, pool, programs, examples):
-        """Evaluates a batch of programs using a provided pool."""
+
+    def _evaluate_batch(self, executor, programs, examples):
+        """Evaluates a batch of programs using the provided executor."""
         # Bind the examples and heuristic to the function
         eval_func = partial(evaluate_single_program, examples=examples, heuristic=self.heuristic)
         
-        # Parallel evaluate the beam array
-        scores = pool.map(eval_func, programs)
+        # Static list conversion to force evaluation within the executor's context
+        scores = list(executor.map(eval_func, programs))
         return list(zip(scores, programs))
 
     def search(self, start_state, target, beam_width=50, max_generations=20):
         print(f"[SYNTHESIS] Running Beam Search exploration over program space...")
         
-        # Initialize a single pool for the entire search session to avoid repeated overhead and resource warnings
-        pool = multiprocessing.Pool(processes=self.cpu_count)
-        
-        try:
+        # ProcessPoolExecutor is a high-level API that manages worker lifecycles more cleanly than raw Pools
+        with concurrent.futures.ProcessPoolExecutor(max_workers=self.cpu_count) as executor:
             # 1. Random Start Generation
             candidates = []
             for _ in range(beam_width * 2):
                 candidates.append(self.grammar.compose('Grid', max_depth=4))
                 
-            beam = self._evaluate_batch(pool, candidates, start_state)
+            beam = self._evaluate_batch(executor, candidates, start_state)
                 
             for gen in range(max_generations):
                 beam.sort(key=lambda x: x[0])
@@ -76,11 +76,8 @@ class ARCBeamSearch(SearchAlgorithm):
                     for _ in range(2):
                         new_candidates.append(self.grammar.compose('Grid', max_depth=5))
                         
-                new_evals = self._evaluate_batch(pool, new_candidates, start_state)
+                new_evals = self._evaluate_batch(executor, new_candidates, start_state)
                 beam.extend(new_evals)
                 
             beam.sort(key=lambda x: x[0])
             return beam[0][1]
-        finally:
-            pool.close()
-            pool.join()

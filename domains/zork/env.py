@@ -36,7 +36,8 @@ class ZorkSOTAEnvironment(Environment):
         self.env.set_state(state)
         
     def get_valid_actions(self):
-        return self.env.get_valid_actions()
+        # Disable parallel validation to prevent leaking multiprocessing pools (improves stability on Mac/Python 3.9)
+        return self.env.get_valid_actions(use_parallel=False)
         
     def step_raw(self, action_string):
         """Immediate execution for BFS loops without semantic parsing overhead"""
