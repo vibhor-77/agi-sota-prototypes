@@ -2,94 +2,133 @@
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/badge/tests-pass-brightgreen)](#)
+[![Tests: 27 pass](https://img.shields.io/badge/tests-27%20pass-brightgreen)](#)
 
-A world-class repository demonstrating Minimum Viable Product (MVP) implementations of advanced State-of-the-Art (SOTA) Artificial General Intelligence (AGI) concepts. It validates these architectures across two highly distinct domains: Continuous spatial search (**ARC**) and Deep dependency discrete pathways (**Zork**).
+MVP implementations of State-of-the-Art AGI concepts, validated across two distinct domains: spatial program synthesis (**ARC-AGI**) and deep symbolic reasoning (**Zork**).
 
-![AGI Concept](https://upload.wikimedia.org/wikipedia/commons/thumb/d/d7/Artificial_Intelligence_Artificial_General_Intelligence_and_Artificial_Super_Intelligence.png/800px-Artificial_Intelligence_Artificial_General_Intelligence_and_Artificial_Super_Intelligence.png)
+## Architecture: The 4 Core Pillars 🏛️
 
-## The 4 Core Pillars Architecture 🏛️
+All agents inherit from the abstract interfaces defined in `core/`:
 
-The codebase is explicitly designed around the theoretical 4 Core Pillars of General Learning. All domain logic inherits from the abstract interfaces defined in `core/`:
-
-1. **Feedback Loops (`core.feedback.Environment`)**: The ability to execute actions in a dynamic world and observe the resulting state changes. Feedback is strictly separated from the cognitive agent.
-2. **Approximability (`core.approximability.Heuristic`)**: The ability to evaluate mathematical distance between abstract states to guide search and avoid navigating exponential complexity spaces blindly.
-3. **Abstraction & Composability (`core.abstraction.StateRepresentation`, `ActionGrammar`)**: The ability to parse raw semantics into structured concepts and dynamically compose primitive functions into novel programmatic transformations.
-4. **Exploration (`core.exploration.SearchAlgorithm`)**: The systematic topological traversal of combinatorial state and program spaces to deduce functional logic.
-
----
-
-## Supported Domains 🌍
-
-### 1. ARC-AGI SOTA (`domains/arc/`)
-A spatial reasoning agent capable of programmatic abstract synthesis. Validated against the [Official ARC-AGI Training Datasets](https://github.com/fchollet/ARC-AGI).
-
-- **Abstraction**: Features an enriched Domain Specific Language (DSL) encompassing geometric transformations like `rotate90`, `mirror`, and topological `crop_to_box`.
-- **Exploration**: Employs **Beam Search** to prioritize and mutate the top-scoring AST programs over generations.
-- **Approximability**: Calculates *Pixel Edit Distance* heuristics to efficiently converge on complex compositions without brute force.
-- *Result*: Achieves robust zero-shot generalization to unseen complex geometrical transformations in milliseconds!
-
-### 2. Zork Deep RL SOTA (`domains/zork/`)
-A deep-horizon symbolic reasoning agent executing the authentic [Infocom Zork 1 binary ROM](https://github.com/fchollet/ARC-AGI) using Microsoft's `jericho` integration.
-
-- **Feedback**: Multi-step lock-and-key design encompassing spatial navigation, lighting, combat, and inventory parsing.
-- **Abstraction**: Utilizes few-shot NLP extraction to map string responses into discrete semantic JSON graphs.
-- **Exploration**: Employs deterministic BFS replay to deduce win parameters through partial observability, successfully hashing the byte-memory to map and prevent state-aliasing!
-- *Result*: Dynamically explores hundreds of parallel timelines, mapping an interconnected memory graph, to successfully compute perfect multi-step execution paths without hardcoded logic.
+| Pillar | Interface | Purpose |
+|:--|:--|:--|
+| **Feedback Loops** | `core.feedback.Environment` | Execute actions, observe state changes |
+| **Approximability** | `core.approximability.Heuristic` | Evaluate distance between states to guide search |
+| **Abstraction** | `core.abstraction.ActionGrammar` | Compose primitives into novel programs |
+| **Exploration** | `core.exploration.SearchAlgorithm` | Traverse combinatorial state/program spaces |
 
 ---
 
-## Quick Start & Setup 🚀
+## Domains 🌍
 
-The project relies on extremely light dependencies (`numpy`/`scipy` for math, `jericho` for Zork). All NLP and spatial reasoning is handled by custom symbolic engines to ensure transparency and performance.
+### ARC-AGI (`domains/arc/`)
+Program synthesis over the [Official ARC-AGI Training Dataset](https://github.com/fchollet/ARC-AGI) (400 tasks).
+
+- **DSL**: 13 primitives — `rotate90`, `mirror_x/y`, `transpose`, `crop`, `pad`, `fill_box`, `replace_color`, `paint`, `tile`, `overlay`
+- **Search**: Evolutionary beam search with mutation, crossover, and heuristic-guided selection
+- **Heuristic**: Pixel edit distance (0.0 = exact match)
+
+### Zork (`domains/zork/`)
+Deep symbolic exploration of [Infocom Zork I](https://en.wikipedia.org/wiki/Zork) (350 total points) using Microsoft's `jericho` engine.
+
+- **Search**: A* best-first with composite reward shaping: `score×10 + inventory×2 + rooms×1`
+- **Abstraction**: Few-shot NLP extraction mapping text to semantic JSON
+- **State**: Byte-level hashing for deduplication across thousands of game states
+
+---
+
+## Quick Start 🚀
 
 ```bash
-# 1. Clone the repository
+# 1. Clone
 git clone https://github.com/vibhor-77/agi-sota-prototypes.git
 cd agi-sota-prototypes
 
-# 2. Setup virtual environment
-python -m venv venv
-source venv/bin/activate
-
-# 3. Install requirements
+# 2. Install dependencies
 pip install -r requirements.txt
 
-# 4. Clone Official ARC Dataset
+# 3. Clone the Official ARC Dataset
 git clone https://github.com/fchollet/ARC-AGI.git data/ARC-AGI
 ```
 
+### Dependencies
+
+| Package | Purpose |
+|:--|:--|
+| `numpy`, `scipy` | Numerical computation |
+| `jericho` | Zork I game engine (bundles SpaCy internally) |
+| `pytest`, `pytest-xdist` | Parallel test execution |
+
 ---
 
-## World-Class Test Suite 🧪
-
-The repository boasts a pristine standard of Code Quality. Every utility, heuristic, AST grammar node, and environment simulation is strictly unit tested, alongside End-To-End (E2E) integration validation.
+## Running Tests 🧪
 
 ```bash
-# Run the 27 comprehensive tests
+# Sequential (standard unittest)
 python -m unittest discover -s tests -t .
+
+# Parallel across all CPU cores (recommended)
+python -m pytest tests/ -n auto -q
 ```
 
 ---
 
-## Running the Agents (`main.py`) 🖥️
+## CLI Usage 🖥️
 
-The architecture is fully modularized and exposed via a unified CLI. 
-
-Both agents dynamically support scaling difficulties from `Level 1` (linear task mapping) to `Level 3` (deep structural dependencies requiring full search topologies).
-
-### 1. Interactive Demonstrations
-Watch the agent explore the environment, build its abstraction graph, and deduce the logical execution sequence step-by-step.
-
+### Interactive Mode
 ```bash
 python main.py interactive --domain zork --level 2
 python main.py interactive --domain arc --level 3
 ```
 
-### 2. High-Performance Benchmarks
-Run the agents headless to evaluate the true speed and generalized power of the 4 Pillars computation across multiple randomized trials.
-
+### Benchmark Mode
 ```bash
+# Basic benchmark
 python main.py benchmark --domain arc --level 3 --trials 10
-python main.py benchmark --domain zork --level 1 --trials 5
+
+# Parallel with configurable workers
+python main.py benchmark --domain zork --level 2 --trials 10 --workers 5
+
+# High-compute ARC: wider beam for better convergence
+python main.py benchmark --domain arc --level 3 --trials 50 --beam-width 200 --workers 10
+
+# High-compute Zork: larger state budget for deeper exploration
+python main.py benchmark --domain zork --level 2 --trials 10 --budget 2000 --workers 5
+```
+
+### CLI Reference
+
+| Flag | Domain | Default | Description |
+|:--|:--|:--|:--|
+| `--level` | Both | 3 | Difficulty (1=easy, 2=medium, 3=hard) |
+| `--trials` | Both | 5 | Number of benchmark trials |
+| `--workers` | Both | CPU count | Parallel worker threads/processes |
+| `--budget` | Zork | 500 (L2) | Max states to expand per trial |
+| `--beam-width` | ARC | 50 | Beam width for evolutionary search |
+
+---
+
+## Project Structure
+
+```
+agi-sota-prototypes/
+├── core/                    # Abstract interfaces (4 Pillars)
+│   ├── feedback.py          # Environment base class
+│   ├── approximability.py   # Heuristic base class
+│   ├── abstraction.py       # StateRepresentation, ActionGrammar
+│   └── exploration.py       # SearchAlgorithm base class
+├── domains/
+│   ├── arc/                 # ARC-AGI domain
+│   │   ├── dsl.py           # 13-primitive DSL + AST nodes + evolutionary operators
+│   │   ├── env.py           # Grid, BoundingBox, task loading
+│   │   ├── heuristics.py    # Pixel edit distance
+│   │   └── search.py        # Evolutionary beam search (parallel)
+│   └── zork/                # Zork domain
+│       ├── env.py           # Jericho wrapper + inventory API
+│       ├── agent.py         # A* reward-shaped exploration
+│       └── semantics.py     # NLP semantic parser
+├── tests/                   # 27 unit + integration tests
+├── data/                    # ARC-AGI dataset + Zork ROM
+├── main.py                  # Unified CLI
+└── requirements.txt
 ```

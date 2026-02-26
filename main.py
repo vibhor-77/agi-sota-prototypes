@@ -151,7 +151,7 @@ def _run_zork_trial(args):
 
 def _run_arc_trial(args):
     """Single ARC trial — must be top-level for ProcessPoolExecutor."""
-    level, = args
+    level, beam_width, max_gens = args
     import time, sys, os
     train_ex, test_tests = generate_2d_arc_task(level=level, official_benchmark=True)
     test_ex = test_tests[0]
@@ -164,7 +164,7 @@ def _run_arc_trial(args):
     os.dup2(devnull, 1)
     os.close(devnull)
     try:
-        best_program = agent.search(train_ex, target=None, beam_width=50, max_generations=20)
+        best_program = agent.search(train_ex, target=None, beam_width=beam_width, max_generations=max_gens)
     finally:
         os.dup2(old_fd, 1)
         os.close(old_fd)
@@ -182,7 +182,8 @@ def _run_arc_trial(args):
 
 
 
-def run_benchmarks(domain, level, trials, workers=None):
+
+def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=None):
     import multiprocessing
     from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
     
@@ -196,11 +197,10 @@ def run_benchmarks(domain, level, trials, workers=None):
     if domain == "zork":
         search_type = "BFS" if level == 1 else "A* Best-First"
         depth = 5 if level == 1 else (15 if level == 2 else 25)
-        budget = 2000 if level == 1 else (500 if level == 2 else 1000)
+        if budget is None:
+            budget = 2000 if level == 1 else (500 if level == 2 else 1000)
         print(f">>> RUNNING PARALLEL EVALUATION ({search_type}, Depth: {depth}, Budget: {budget})")
         
-        # ThreadPoolExecutor for Zork: Jericho C state isn't picklable,
-        # but GIL is released during SpaCy/Frotz C-level calls
         trial_args = [(level, depth, budget)] * trials
         with ThreadPoolExecutor(max_workers=min(workers, trials)) as executor:
             results = list(executor.map(_run_zork_trial, trial_args))
@@ -214,7 +214,7 @@ def run_benchmarks(domain, level, trials, workers=None):
         
         avg_score = total_score / trials
         avg_time = total_time / trials
-        wall_time = max(r[1] for r in results)  # Wall clock is the slowest trial
+        wall_time = max(r[1] for r in results)
         print(f"\n=== TRUE BASELINE RESULTS ===")
         print(f"Average Episode Score:     {avg_score:.1f}/350")
         print(f"Average CPU Time:          {avg_time:.3f}s per trial")
@@ -222,10 +222,11 @@ def run_benchmarks(domain, level, trials, workers=None):
         print("=============================")
         
     elif domain == "arc":
-        print(f">>> RUNNING PARALLEL EVALUATION (Evolutionary Beam Search)")
+        bw = beam_width if beam_width else 50
+        gens = 20
+        print(f">>> RUNNING PARALLEL EVALUATION (Beam: {bw}, Gens: {gens})")
         
-        # ProcessPoolExecutor for ARC: each trial is independent
-        trial_args = [(level,)] * trials
+        trial_args = [(level, bw, gens)] * trials
         effective_workers = min(workers, trials)
         with ProcessPoolExecutor(max_workers=effective_workers) as executor:
             results = list(executor.map(_run_arc_trial, trial_args))
@@ -253,13 +254,25 @@ def run_benchmarks(domain, level, trials, workers=None):
 if __name__ == "__main__":
     import multiprocessing
     
-    parser = argparse.ArgumentParser(description="AGI Core Pillars Execution CLI")
+    parser = argparse.ArgumentParser(
+        description="AGI Core Pillars — Benchmark & Interactive CLI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""Examples:
+  python main.py interactive --domain zork --level 2
+  python main.py benchmark --domain arc --level 3 --trials 20 --workers 5
+  python main.py benchmark --domain zork --level 2 --trials 10 --budget 2000 --workers 5
+  python main.py benchmark --domain arc --level 3 --trials 50 --beam-width 200 --workers 10
+""")
     parser.add_argument("mode", choices=["interactive", "benchmark"], help="Execution mode")
     parser.add_argument("--domain", choices=["arc", "zork"], required=True, help="Domain to run")
     parser.add_argument("--level", type=int, choices=[1, 2, 3], default=3, help="Difficulty level (1-3)")
     parser.add_argument("--trials", type=int, default=5, help="Number of trials for benchmark mode")
     parser.add_argument("--workers", type=int, default=multiprocessing.cpu_count(),
                         help=f"Parallel workers (default: {multiprocessing.cpu_count()} = auto-detected CPUs)")
+    parser.add_argument("--budget", type=int, default=None,
+                        help="Zork: max states to expand per trial (default: 500 for L2, 1000 for L3)")
+    parser.add_argument("--beam-width", type=int, default=None, dest="beam_width",
+                        help="ARC: beam width for evolutionary search (default: 50)")
     
     args = parser.parse_args()
     
@@ -269,5 +282,5 @@ if __name__ == "__main__":
         elif args.domain == "arc":
             run_arc_interactive(args.level)
     elif args.mode == "benchmark":
-        run_benchmarks(args.domain, args.level, args.trials, workers=args.workers)
-
+        run_benchmarks(args.domain, args.level, args.trials,
+                       workers=args.workers, budget=args.budget, beam_width=args.beam_width)
