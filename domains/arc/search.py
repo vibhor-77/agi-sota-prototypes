@@ -2,16 +2,6 @@ from core.exploration import SearchAlgorithm
 from domains.arc.dsl import ARCGrammar
 from domains.arc.heuristics import PixelEditDistance
 
-class ARCBeamSearch(SearchAlgorithm):
-    """
-    Pillar 4: Exploration.
-    Systematically traverses the compositional program space using a Heuristic guide
-    to converge on highly complex target tasks without brute-forcing exponential trees.
-    """
-    def __init__(self):
-        self.grammar = ARCGrammar()
-        self.heuristic = PixelEditDistance()
-        
 import multiprocessing
 from functools import partial
 
@@ -37,6 +27,10 @@ class ARCBeamSearch(SearchAlgorithm):
         self.grammar = ARCGrammar()
         self.heuristic = PixelEditDistance()
         self.cpu_count = max(1, multiprocessing.cpu_count() - 1)
+        
+    def _evaluate_program(self, program, examples):
+        """Helper to evaluate a single program (used by tests)."""
+        return evaluate_single_program(program, examples, self.heuristic)
         
     def _evaluate_batch(self, programs, examples):
         # Bind the examples and heuristic to the function
