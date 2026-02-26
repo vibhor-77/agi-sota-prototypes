@@ -106,8 +106,8 @@ class ZorkSOTAEnvironment(Environment):
                 return "It is too dark to move anywhere but back SOUTH."
                 
             if target == "EAST" and self.state["room"] == conflict_room:
-                if self.state["flags"]["troll_alive"]: return "The troll blocks your path! He looks hungry."
-                if self.state["flags"]["door_locked"]: return "The heavy door is locked."
+                if self.level >= 2 and self.state["flags"]["troll_alive"]: return "The troll blocks your path! He looks hungry."
+                if (self.level == 1 or self.level == 3) and self.state["flags"]["door_locked"]: return "The heavy door is locked."
                     
             if target in current_room:
                 self.state["room"] = current_room[target]

@@ -24,13 +24,43 @@ A deep-horizon symbolic reasoning agent operating in a multi-state stochastic te
 - **Approximability / Exploration**: Employs deterministic BFS replay to deduce win parameters through partial observability state-aliasing prevention.
 - *Result*: Dynamically computes a perfect >8 step deep execution pathway without hardcoded logic.
 
-## Running the Agents
-The architecture is fully modularized. Run the entry point scripts for each domain:
+## Quick Start & Setup
+
+The project relies on very light dependencies (numpy/scipy) for the abstract computation.
 
 ```bash
-# Run the Spatial Composition Engine (ARC)
-python -m domains.arc.run
+# 1. Clone the repository
+git clone https://github.com/vibhor-77/agi-sota-prototypes.git
+cd agi-sota-prototypes
 
-# Run the Deep Symbolic Pathway Planner (Zork)
-python -m domains.zork.run
+# 2. Setup virtual environment
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 3. Run the blazing fast unit tests
+python -m unittest discover tests/
+```
+
+## Running the Agents (`main.py`)
+The architecture is fully modularized and exposed via a unified CLI. 
+
+Both agents dynamically support scaling difficulties from `Level 1` (linear task mapping) to `Level 3` (deep structural dependencies requiring full search topologies).
+
+### 1. Interactive Demonstrations
+Watch the agent explore the environment, build its abstraction graph, and deduce the logical execution sequence step-by-step.
+```bash
+python main.py interactive --domain zork --level 3
+```
+```bash
+python main.py interactive --domain arc --level 2
+```
+
+### 2. High-Performance Benchmarks
+Run the agents headless to evaluate the true speed and generalized power of the 4 Pillars computation.
+```bash
+python main.py benchmark --domain arc --level 3 --trials 10
+```
+```bash
+python main.py benchmark --domain zork --level 3 --trials 10
 ```
