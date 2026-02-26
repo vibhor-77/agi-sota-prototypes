@@ -18,9 +18,9 @@ from domains.zork.semantics import ZorkSemanticParser
 from domains.arc.env import ARCEnvironment, generate_2d_arc_task
 from domains.arc.search import ARCBeamSearch
 
-def run_zork_interactive(level):
+def run_zork_interactive(level, verbose=False):
     print(f"\n{'='*50}")
-    print(f" ZORK AGI: LEVEL {level} INTERACTIVE DEMO")
+    print(f" ZORK AGI: LEVEL {level} INTERACTIVE DEMO {'(VERBOSE)' if verbose else ''}")
     print(f" {'='*50}\n")
     
     env = ZorkSOTAEnvironment(level=level)
@@ -30,8 +30,14 @@ def run_zork_interactive(level):
     start_obs = env.get_observation()
     print(f"INITIAL STATE:\n{start_obs}\n")
     
-    print("[AGENT] Exploring phase using BFS abstraction graph building...")
-    # Dynamic goals based on level for true Zork 1 ROM
+    if verbose:
+        print(f"[VERBOSE] Game score at start: {env.get_score()}")
+        try:
+            print(f"[VERBOSE] Starting inventory: {env.get_inventory()}")
+        except Exception:
+            print(f"[VERBOSE] Starting inventory: []")
+    
+    # Dynamic goals based on level
     if level == 1:
         depth = 2
         goal = "leaflet"
@@ -41,19 +47,25 @@ def run_zork_interactive(level):
     else:
         depth = 6
         goal = "sword"
+    
+    print(f"[AGENT] Exploring (depth={depth}, goal='{goal}')...")
         
     t0 = time.time()
-    # Pass the actual instantiated env instead of a lambda to save memory creation
-    agent.explore_world(lambda: env, max_depth=depth)
+    agent.explore_world(lambda: env, max_depth=depth, verbose=verbose)
     t1 = time.time()
     
     print(f"[*] Discovered {len(agent.known_states)} unique states in {t1-t0:.2f}s.\n")
+    
+    if verbose:
+        print(f"[VERBOSE] World graph: {sum(len(v) for v in agent.world_graph.values())} edges across {len(agent.world_graph)} nodes")
+        if agent.best_path:
+            print(f"[VERBOSE] Best exploration path: {' → '.join(agent.best_path)}")
     
     print(f"[AGENT] Planning path to '{goal}'...")
     winning_actions = agent.search(env, target_keyword=goal)
     
     if winning_actions:
-        print("\n>>> DEDUCED WINNING PLAN:")
+        print(f"\n>>> DEDUCED WINNING PLAN ({len(winning_actions)} steps):")
         for step, a in enumerate(winning_actions):
             print(f"  Step {step+1}: '{a}'")
             
@@ -61,41 +73,69 @@ def run_zork_interactive(level):
         fresh_env = ZorkSOTAEnvironment(level=level)
         for a in winning_actions:
             print(f" > USER: {a}")
-            # Execute the action string directly on the Frotz engine
             obs = fresh_env.step_raw(a)
             print(f" > ZORK: {obs}")
-            time.sleep(0.5) # Slight pause for interactive feel
+            if verbose:
+                print(f"   [VERBOSE] Score after action: {fresh_env.get_score()}")
+            time.sleep(0.3)
             
-        print(f"\n[+] RESULT: PERFECT DEEP HORIZON REASONING ACHIEVED (Level {level}).")
+        final_score = fresh_env.get_score()
+        print(f"\n[+] RESULT: Plan executed. Final score: {final_score}/350 (Level {level}).")
     else:
         print("\n[-] RESULT: FAILED TO DEDUCE WINNING LOGIC.")
+        if verbose:
+            print(f"[VERBOSE] '{goal}' not found in any of {len(agent.state_texts)} explored state texts.")
+            # Show closest matches
+            for h, text in list(agent.state_texts.items())[:5]:
+                print(f"  State: \"{text[:100]}...\"")
 
-def run_arc_interactive(level):
+def run_arc_interactive(level, verbose=False):
     print(f"\n{'='*50}")
-    print(f" ARC AGI: LEVEL {level} INTERACTIVE DEMO")
+    print(f" ARC AGI: LEVEL {level} INTERACTIVE DEMO {'(VERBOSE)' if verbose else ''}")
     print(f" {'='*50}\n")
     
     train_ex, test_tests = generate_2d_arc_task(level=level)
-    test_ex = test_tests[0] # Just evaluate on the first test case
+    test_ex = test_tests[0]
     
     print(">>> OBSERVING TRAINING GRIDS")
     for i, (inp, out) in enumerate(train_ex):
         print(f"\n--- Train {i+1} ---")
-        print(f"Input:\n{inp.arr}")
-        print(f"Output:\n{out.arr}")
+        print(f"Input  ({inp.arr.shape[0]}×{inp.arr.shape[1]}):\n{inp.arr}")
+        print(f"Output ({out.arr.shape[0]}×{out.arr.shape[1]}):\n{out.arr}")
+        if verbose:
+            import numpy as np
+            diff_pixels = np.sum(inp.arr != out.arr) if inp.arr.shape == out.arr.shape else "N/A (shape change)"
+            print(f"[VERBOSE] Pixel diff: {diff_pixels}")
         
     agent = ARCBeamSearch()
     
     t0 = time.time()
-    best_program = agent.search(train_ex, target=None, beam_width=100, max_generations=30)
+    best_program = agent.search(train_ex, target=None, beam_width=100, max_generations=30, verbose=verbose)
     t1 = time.time()
     
     print("\n==================================================")
-    print(">>> COMPOSITIONAL LEARNING CONVERGED")
+    print(">>> COMPOSITIONAL LEARNING RESULT")
     print("==================================================")
     if best_program:
         print(f"[*] Search Time: {t1-t0:.2f}s")
         print(f"[*] Discovered Concept: f(grid) = {str(best_program)}\n")
+        
+        if verbose:
+            # Show how the program performs on each training example
+            from domains.arc.heuristics import PixelEditDistance
+            hed = PixelEditDistance()
+            print("[VERBOSE] Training example validation:")
+            for i, (inp, out) in enumerate(train_ex):
+                try:
+                    pred = best_program.evaluate({'input_grid': inp})
+                    loss = hed.evaluate(pred, out)
+                    match = "✅ EXACT" if loss == 0.0 else f"❌ loss={loss:.4f}"
+                    print(f"  Train {i+1}: {match}")
+                    if loss > 0.0:
+                        print(f"    Predicted: {pred.arr}")
+                        print(f"    Expected:  {out.arr}")
+                except Exception as e:
+                    print(f"  Train {i+1}: ❌ CRASH: {e}")
         
         print(">>> EXTRAPOLATION ON UNSEEN TEST GRID")
         test_in, test_out = test_ex
@@ -103,14 +143,24 @@ def run_arc_interactive(level):
         env = ARCEnvironment(test_in)
         predicted = env.execute_action(best_program)
         
-        print(f"Input Grid:\n{test_in.arr}")
-        print(f"AI Predicted:\n{predicted.arr}")
-        print(f"True Answer:\n{test_out.arr}")
+        print(f"Input Grid  ({test_in.arr.shape[0]}×{test_in.arr.shape[1]}):\n{test_in.arr}")
+        print(f"AI Predicted ({predicted.arr.shape[0]}×{predicted.arr.shape[1]}):\n{predicted.arr}")
+        print(f"True Answer  ({test_out.arr.shape[0]}×{test_out.arr.shape[1]}):\n{test_out.arr}")
         
         if predicted == test_out:
             print(f"\n[+] RESULT: PERFECT 2D GENERALIZATION ACHIEVED (Level {level}).")
         else:
             print(f"\n[-] RESULT: TEST FAILED (Level {level}).")
+            if verbose:
+                import numpy as np
+                if predicted.arr.shape == test_out.arr.shape:
+                    diff = predicted.arr != test_out.arr
+                    wrong = np.sum(diff)
+                    total = test_out.arr.size
+                    print(f"[VERBOSE] Pixel accuracy: {total - wrong}/{total} ({(total-wrong)/total*100:.1f}%)")
+                    print(f"[VERBOSE] Wrong pixels at positions: {list(zip(*np.where(diff)))[:10]}{'...' if wrong > 10 else ''}")
+                else:
+                    print(f"[VERBOSE] Shape mismatch: predicted {predicted.arr.shape} vs expected {test_out.arr.shape}")
     else:
         print("[-] Search failed.")
 
@@ -177,14 +227,28 @@ def _run_arc_trial(args):
     t1 = time.time()
     
     success = False
-    ast_str = ""
+    ast_str = str(best_program) if best_program else ""
+    final_loss = -1.0
+    diag = ""
+    
     if best_program:
         predicted = ARCEnvironment(test_ex[0]).execute_action(best_program)
         if predicted == test_ex[1]:
             success = True
-            ast_str = str(best_program)
+            final_loss = 0.0
+        else:
+            # Compute diagnostic info
+            import numpy as np
+            from domains.arc.heuristics import PixelEditDistance
+            final_loss = PixelEditDistance().evaluate(predicted, test_ex[1])
+            if predicted.arr.shape == test_ex[1].arr.shape:
+                wrong = int(np.sum(predicted.arr != test_ex[1].arr))
+                total = test_ex[1].arr.size
+                diag = f"loss={final_loss:.4f}, {wrong}/{total} wrong pixels"
+            else:
+                diag = f"loss={final_loss:.4f}, shape {predicted.arr.shape} vs {test_ex[1].arr.shape}"
     
-    return success, t1 - t0, ast_str
+    return success, t1 - t0, ast_str, final_loss, diag
 
 
 
@@ -243,13 +307,16 @@ def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=
         
         success_count = 0
         total_time = 0.0
-        for i, (success, elapsed, ast_str) in enumerate(results):
+        for i, (success, elapsed, ast_str, final_loss, diag) in enumerate(results):
             total_time += elapsed
             if success:
                 success_count += 1
                 print(f"Trial {i+1}/{trials} | SUCCESS | Time: {elapsed:.3f}s | AST: {ast_str}")
             else:
-                print(f"Trial {i+1}/{trials} | FAILED  | Time: {elapsed:.3f}s")
+                if verbose and ast_str:
+                    print(f"Trial {i+1}/{trials} | FAILED  | Time: {elapsed:.3f}s | {diag} | Best: {ast_str}")
+                else:
+                    print(f"Trial {i+1}/{trials} | FAILED  | Time: {elapsed:.3f}s")
         
         success_rate = (success_count / trials) * 100
         avg_time = total_time / trials
@@ -294,9 +361,9 @@ if __name__ == "__main__":
     
     if args.mode == "interactive":
         if args.domain == "zork":
-            run_zork_interactive(args.level)
+            run_zork_interactive(args.level, verbose=args.verbose)
         elif args.domain == "arc":
-            run_arc_interactive(args.level)
+            run_arc_interactive(args.level, verbose=args.verbose)
     elif args.mode == "benchmark":
         run_benchmarks(args.domain, args.level, args.trials,
                        workers=args.workers, budget=args.budget,
