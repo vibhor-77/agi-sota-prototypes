@@ -87,7 +87,7 @@ def run_arc_interactive(level):
     agent = ARCBeamSearch()
     
     t0 = time.time()
-    best_program = agent.search(train_ex, target=None, beam_width=50, max_generations=20)
+    best_program = agent.search(train_ex, target=None, beam_width=100, max_generations=30)
     t1 = time.time()
     
     print("\n==================================================")
@@ -118,23 +118,26 @@ def run_arc_interactive(level):
 
 def _run_zork_trial(args):
     """Single Zork trial — must be top-level for ThreadPoolExecutor."""
-    level, depth, budget = args
+    level, depth, budget, verbose = args
     import time, pickle, sys, os
     
     t0 = time.time()
     env = ZorkSOTAEnvironment(level=level)
     agent = ZorkDeepAgent()
     
-    # Thread-safe stdout suppression: redirect at OS file descriptor level
-    devnull = os.open(os.devnull, os.O_WRONLY)
-    old_fd = os.dup(1)  # Save original stdout fd
-    os.dup2(devnull, 1)  # Redirect fd 1 (stdout) to /dev/null
-    os.close(devnull)
-    try:
-        agent.explore_world(lambda: env, max_depth=depth, max_states=budget)
-    finally:
-        os.dup2(old_fd, 1)  # Restore original stdout
-        os.close(old_fd)
+    if verbose:
+        # Don't suppress output in verbose mode
+        agent.explore_world(lambda: env, max_depth=depth, max_states=budget, verbose=True)
+    else:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        old_fd = os.dup(1)
+        os.dup2(devnull, 1)
+        os.close(devnull)
+        try:
+            agent.explore_world(lambda: env, max_depth=depth, max_states=budget)
+        finally:
+            os.dup2(old_fd, 1)
+            os.close(old_fd)
     
     max_score = 0
     for state_hash in agent.known_states:
@@ -151,7 +154,7 @@ def _run_zork_trial(args):
 
 def _run_arc_trial(args):
     """Single ARC trial — must be top-level for ProcessPoolExecutor."""
-    level, beam_width, max_gens = args
+    level, beam_width, max_gens, verbose = args
     import time, sys, os
     train_ex, test_tests = generate_2d_arc_task(level=level, official_benchmark=True)
     test_ex = test_tests[0]
@@ -159,15 +162,18 @@ def _run_arc_trial(args):
     agent = ARCBeamSearch()
     
     t0 = time.time()
-    devnull = os.open(os.devnull, os.O_WRONLY)
-    old_fd = os.dup(1)
-    os.dup2(devnull, 1)
-    os.close(devnull)
-    try:
-        best_program = agent.search(train_ex, target=None, beam_width=beam_width, max_generations=max_gens)
-    finally:
-        os.dup2(old_fd, 1)
-        os.close(old_fd)
+    if verbose:
+        best_program = agent.search(train_ex, target=None, beam_width=beam_width, max_generations=max_gens, verbose=True)
+    else:
+        devnull = os.open(os.devnull, os.O_WRONLY)
+        old_fd = os.dup(1)
+        os.dup2(devnull, 1)
+        os.close(devnull)
+        try:
+            best_program = agent.search(train_ex, target=None, beam_width=beam_width, max_generations=max_gens)
+        finally:
+            os.dup2(old_fd, 1)
+            os.close(old_fd)
     t1 = time.time()
     
     success = False
@@ -182,13 +188,17 @@ def _run_arc_trial(args):
 
 
 
-
-def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=None):
+def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=None, max_gens=None, verbose=False):
     import multiprocessing
     from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
     
     if workers is None:
         workers = multiprocessing.cpu_count()
+    
+    # In verbose mode, force single worker for readable sequential output
+    if verbose:
+        workers = 1
+        print("[VERBOSE] Forcing workers=1 for readable sequential output\n")
     
     print(f"\n{'='*50}")
     print(f" BENCHMARKING {domain.upper()} (Level {level}) | Trials: {trials} | Workers: {workers}")
@@ -198,10 +208,10 @@ def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=
         search_type = "BFS" if level == 1 else "A* Best-First"
         depth = 5 if level == 1 else (15 if level == 2 else 25)
         if budget is None:
-            budget = 2000 if level == 1 else (500 if level == 2 else 1000)
-        print(f">>> RUNNING PARALLEL EVALUATION ({search_type}, Depth: {depth}, Budget: {budget})")
+            budget = 2000 if level == 1 else (1000 if level == 2 else 2000)
+        print(f">>> {'VERBOSE ' if verbose else ''}EVALUATION ({search_type}, Depth: {depth}, Budget: {budget})")
         
-        trial_args = [(level, depth, budget)] * trials
+        trial_args = [(level, depth, budget, verbose)] * trials
         with ThreadPoolExecutor(max_workers=min(workers, trials)) as executor:
             results = list(executor.map(_run_zork_trial, trial_args))
         
@@ -215,18 +225,18 @@ def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=
         avg_score = total_score / trials
         avg_time = total_time / trials
         wall_time = max(r[1] for r in results)
-        print(f"\n=== TRUE BASELINE RESULTS ===")
+        print(f"\n=== RESULTS ===")
         print(f"Average Episode Score:     {avg_score:.1f}/350")
         print(f"Average CPU Time:          {avg_time:.3f}s per trial")
         print(f"Wall Clock Time:           {wall_time:.3f}s (parallel)")
-        print("=============================")
+        print("===============")
         
     elif domain == "arc":
-        bw = beam_width if beam_width else 50
-        gens = 20
-        print(f">>> RUNNING PARALLEL EVALUATION (Beam: {bw}, Gens: {gens})")
+        bw = beam_width if beam_width else 100
+        gens = max_gens if max_gens else 30
+        print(f">>> {'VERBOSE ' if verbose else ''}EVALUATION (Beam: {bw}, Gens: {gens})")
         
-        trial_args = [(level, bw, gens)] * trials
+        trial_args = [(level, bw, gens, verbose)] * trials
         effective_workers = min(workers, trials)
         with ProcessPoolExecutor(max_workers=effective_workers) as executor:
             results = list(executor.map(_run_arc_trial, trial_args))
@@ -244,11 +254,11 @@ def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=
         success_rate = (success_count / trials) * 100
         avg_time = total_time / trials
         wall_time = max(r[1] for r in results)
-        print(f"\n=== TRUE BASELINE RESULTS ===")
+        print(f"\n=== RESULTS ===")
         print(f"Full Dataset Success Rate: {success_rate:.1f}% ({success_count}/{trials})")
         print(f"Average CPU Time:          {avg_time:.3f}s per trial")
         print(f"Wall Clock Time:           {wall_time:.3f}s (parallel)")
-        print("=============================")
+        print("===============")
 
 
 if __name__ == "__main__":
@@ -259,9 +269,11 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
   python main.py interactive --domain zork --level 2
+  python main.py interactive --domain arc --level 3 --verbose
   python main.py benchmark --domain arc --level 3 --trials 20 --workers 5
-  python main.py benchmark --domain zork --level 2 --trials 10 --budget 2000 --workers 5
-  python main.py benchmark --domain arc --level 3 --trials 50 --beam-width 200 --workers 10
+  python main.py benchmark --domain zork --level 2 --trials 10 --budget 2000
+  python main.py benchmark --domain arc --level 3 --trials 5 --beam-width 200 --max-gens 50
+  python main.py benchmark --domain zork --level 2 --trials 1 --verbose
 """)
     parser.add_argument("mode", choices=["interactive", "benchmark"], help="Execution mode")
     parser.add_argument("--domain", choices=["arc", "zork"], required=True, help="Domain to run")
@@ -270,9 +282,13 @@ if __name__ == "__main__":
     parser.add_argument("--workers", type=int, default=multiprocessing.cpu_count(),
                         help=f"Parallel workers (default: {multiprocessing.cpu_count()} = auto-detected CPUs)")
     parser.add_argument("--budget", type=int, default=None,
-                        help="Zork: max states to expand per trial (default: 500 for L2, 1000 for L3)")
+                        help="Zork: max states to expand per trial (default: 1000 for L2, 2000 for L3)")
     parser.add_argument("--beam-width", type=int, default=None, dest="beam_width",
-                        help="ARC: beam width for evolutionary search (default: 50)")
+                        help="ARC: beam width for evolutionary search (default: 100)")
+    parser.add_argument("--max-gens", type=int, default=None, dest="max_gens",
+                        help="ARC: max generations for evolutionary search (default: 30)")
+    parser.add_argument("--verbose", "-v", action="store_true",
+                        help="Enable detailed logging (room discovery, inventory, per-gen stats)")
     
     args = parser.parse_args()
     
@@ -283,4 +299,6 @@ if __name__ == "__main__":
             run_arc_interactive(args.level)
     elif args.mode == "benchmark":
         run_benchmarks(args.domain, args.level, args.trials,
-                       workers=args.workers, budget=args.budget, beam_width=args.beam_width)
+                       workers=args.workers, budget=args.budget,
+                       beam_width=args.beam_width, max_gens=args.max_gens,
+                       verbose=args.verbose)

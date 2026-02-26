@@ -19,36 +19,39 @@ class ZorkDeepAgent(SearchAlgorithm):
     def _state_to_hash(self, state):
         return pickle.dumps(state)
 
-    def explore_world(self, env_class, max_depth=12, max_states=5000):
+    def explore_world(self, env_class, max_depth=12, max_states=5000, verbose=False):
         print(f"[AGENT] A* Reward-Shaped Search (Depth: {max_depth}, Budget: {max_states} states)...")
         
         env = env_class()
         self.state_texts = {}
-        self.best_path = []  # Track best action sequence for replay
+        self.best_path = []
         
         start_state = env.get_state()
         start_hash = self._state_to_hash(start_state)
         self.known_states.add(start_hash)
         self.state_texts[start_hash] = env.get_observation()
         
-        # Track unique room descriptions for room-discovery bonus
-        unique_rooms = {env.get_observation()[:80]}  # First 80 chars as room signature
+        unique_rooms = {env.get_observation()[:80]}
         
-        # Composite heuristic: h(s) = score*10 + inventory_count*2 + unique_rooms*1
         start_score = env.get_score()
         try:
             start_inv = len(env.get_inventory())
+            start_inv_items = env.get_inventory()
         except Exception:
             start_inv = 0
+            start_inv_items = []
         start_h = start_score * 10 + start_inv * 2 + len(unique_rooms)
         
-        # Priority Queue: (-composite_h, depth, path, state_hash, state_obj)
+        if verbose:
+            print(f"[VERBOSE] Start state: score={start_score}, inventory={start_inv_items}, rooms=1")
+        
         pq = []
         heapq.heappush(pq, (-start_h, 0, [], start_hash, start_state))
         
         best_composite = start_h
         best_game_score = start_score
         states_expanded = 0
+        prev_inv_count = start_inv
         
         while pq and states_expanded < max_states:
             neg_h, depth, path, curr_hash, curr_state = heapq.heappop(pq)
@@ -59,7 +62,6 @@ class ZorkDeepAgent(SearchAlgorithm):
                 best_composite = current_h
                 self.best_path = path
                 
-            # Progress logging every 500 states
             if states_expanded % 500 == 0:
                 print(f"[AGENT] ... {states_expanded}/{max_states} | h={best_composite} | Score: {best_game_score}/350 | Rooms: {len(unique_rooms)}")
                 
@@ -69,27 +71,39 @@ class ZorkDeepAgent(SearchAlgorithm):
             env.load_state(curr_state)
             valid_actions = env.get_valid_actions()
             
+            if verbose and states_expanded <= 20:
+                print(f"[VERBOSE] State #{states_expanded} depth={depth} h={current_h} | {len(valid_actions)} actions: {valid_actions[:5]}{'...' if len(valid_actions)>5 else ''}")
+            
             for action in valid_actions:
                 env.load_state(curr_state)
                 obs = env.step_raw(action)
                 next_game_score = env.get_score()
                 
-                # Compute composite reward
                 try:
-                    inv_count = len(env.get_inventory())
+                    inv_items = env.get_inventory()
+                    inv_count = len(inv_items)
                 except Exception:
+                    inv_items = []
                     inv_count = 0
                     
                 room_sig = obs[:80]
                 is_new_room = room_sig not in unique_rooms
                 if is_new_room:
                     unique_rooms.add(room_sig)
+                    if verbose:
+                        print(f"[VERBOSE] 🗺️  NEW ROOM at depth {depth+1}: \"{room_sig}...\"")
                     
                 composite_h = next_game_score * 10 + inv_count * 2 + len(unique_rooms)
                 
                 if next_game_score > best_game_score:
                     best_game_score = next_game_score
-                    print(f"[AGENT] Score ↑ {best_game_score}/350 at depth {depth+1} ({states_expanded} states)")
+                    print(f"[AGENT] Score ↑ {best_game_score}/350 at depth {depth+1} via '{action}' ({states_expanded} states)")
+                    if verbose:
+                        print(f"[VERBOSE] 🎯 Path to score: {' → '.join(path + [action])}")
+                
+                if verbose and inv_count > prev_inv_count:
+                    new_items = [i for i in inv_items if i not in start_inv_items]
+                    print(f"[VERBOSE] 📦 INVENTORY CHANGE at depth {depth+1}: +{inv_count - prev_inv_count} items via '{action}' → {inv_items}")
                 
                 next_state = env.get_state()
                 next_hash = self._state_to_hash(next_state)
@@ -105,6 +119,8 @@ class ZorkDeepAgent(SearchAlgorithm):
                     
         env.load_state(start_state)
         print(f"[AGENT] Done. {states_expanded} expanded, {len(self.known_states)} states, {len(unique_rooms)} rooms. Best: {best_game_score}/350 (h={best_composite})")
+        if verbose and self.best_path:
+            print(f"[VERBOSE] Best path ({len(self.best_path)} steps): {' → '.join(self.best_path)}")
         
     def search(self, start_env, target_keyword, **kwargs):
         print(f"\n[AGENT] BFS Graph Search over composed hypotheses for: '{target_keyword}'")

@@ -67,9 +67,11 @@ git clone https://github.com/fchollet/ARC-AGI.git data/ARC-AGI
 # Sequential (standard unittest)
 python -m unittest discover -s tests -t .
 
-# Parallel across all CPU cores (recommended)
+# Parallel across all CPU cores (recommended, 2-3× faster)
 python -m pytest tests/ -n auto -q
 ```
+
+> Parallel tests require `pytest` + `pytest-xdist` (included in requirements.txt).
 
 ---
 
@@ -89,11 +91,15 @@ python main.py benchmark --domain arc --level 3 --trials 10
 # Parallel with configurable workers
 python main.py benchmark --domain zork --level 2 --trials 10 --workers 5
 
-# High-compute ARC: wider beam for better convergence
-python main.py benchmark --domain arc --level 3 --trials 50 --beam-width 200 --workers 10
+# High-compute ARC: wider beam + more generations
+python main.py benchmark --domain arc --level 3 --trials 50 --beam-width 200 --max-gens 50
 
-# High-compute Zork: larger state budget for deeper exploration
-python main.py benchmark --domain zork --level 2 --trials 10 --budget 2000 --workers 5
+# High-compute Zork: larger state budget
+python main.py benchmark --domain zork --level 2 --trials 10 --budget 2000
+
+# Verbose mode: detailed per-action logging for debugging
+python main.py benchmark --domain zork --level 2 --trials 1 --verbose
+python main.py benchmark --domain arc --level 3 --trials 1 --verbose
 ```
 
 ### CLI Reference
@@ -103,8 +109,10 @@ python main.py benchmark --domain zork --level 2 --trials 10 --budget 2000 --wor
 | `--level` | Both | 3 | Difficulty (1=easy, 2=medium, 3=hard) |
 | `--trials` | Both | 5 | Number of benchmark trials |
 | `--workers` | Both | CPU count | Parallel worker threads/processes |
-| `--budget` | Zork | 500 (L2) | Max states to expand per trial |
-| `--beam-width` | ARC | 50 | Beam width for evolutionary search |
+| `--budget` | Zork | 1000 (L2) | Max states to expand per trial |
+| `--beam-width` | ARC | 100 | Beam width for evolutionary search |
+| `--max-gens` | ARC | 30 | Max generations for evolution |
+| `--verbose` / `-v` | Both | off | Detailed logging (forces workers=1) |
 
 ---
 
