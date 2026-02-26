@@ -259,11 +259,6 @@ def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=
     if workers is None:
         workers = multiprocessing.cpu_count()
     
-    # In verbose mode, force single worker for readable sequential output
-    if verbose:
-        workers = 1
-        print("[VERBOSE] Forcing workers=1 for readable sequential output\n")
-    
     print(f"\n{'='*50}")
     print(f" BENCHMARKING {domain.upper()} (Level {level}) | Trials: {trials} | Workers: {workers}")
     print(f" {'='*50}\n")

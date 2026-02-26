@@ -112,7 +112,7 @@ python main.py benchmark --domain arc --level 3 --trials 1 --verbose
 | `--budget` | Zork | 1000 (L2) | Max states to expand per trial |
 | `--beam-width` | ARC | 100 | Beam width for evolutionary search |
 | `--max-gens` | ARC | 30 | Max generations for evolution |
-| `--verbose` / `-v` | Both | off | Detailed logging (forces workers=1) |
+| `--verbose` / `-v` | Both | off | Detailed logging for debugging |
 
 ---
 
