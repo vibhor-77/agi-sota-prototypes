@@ -123,7 +123,11 @@ def run_benchmarks(domain, level, trials):
     total_time = 0.0
     
     if domain == "zork":
-        print(">>> RUNNING TRUE BASELINE EVALUATION (Max Depth BFS)")
+        search_type = "BFS" if level == 1 else "A* Best-First"
+        depth = 5 if level == 1 else (15 if level == 2 else 25)
+        budget = 2000 if level == 1 else (500 if level == 2 else 1000)
+        print(f">>> RUNNING TRUE BASELINE EVALUATION ({search_type}, Depth: {depth}, Budget: {budget})")
+        
         for i in range(trials):
             t0 = time.time()
             env = ZorkSOTAEnvironment(level=level)
@@ -131,15 +135,19 @@ def run_benchmarks(domain, level, trials):
             
             # Suppress prints for pure benching
             import sys, os
+            old_stdout = sys.stdout
             sys.stdout = open(os.devnull, 'w')
-            # BFS explores to a bounded depth before evaluating maximum score
-            agent.explore_world(lambda: env, max_depth=5)
-            sys.stdout = sys.__stdout__
+            try:
+                agent.explore_world(lambda: env, max_depth=depth, max_states=budget)
+            finally:
+                sys.stdout = old_stdout
             
+            # Find the actual maximum score achieved during exploration
             import pickle
             max_score = 0
             for state_hash in agent.known_states:
                 try:
+                    # We can use the score from the agent's internal records or re-eval
                     env.load_state(pickle.loads(state_hash))
                     max_score = max(max_score, env.get_score())
                 except Exception:

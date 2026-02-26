@@ -19,8 +19,8 @@ class ZorkDeepAgent(SearchAlgorithm):
     def _state_to_hash(self, state):
         return pickle.dumps(state)
 
-    def explore_world(self, env_class, max_depth=12):
-        print(f"[AGENT] Exploring phase: A* Best-First Heuristic Search (Max Depth: {max_depth})...")
+    def explore_world(self, env_class, max_depth=12, max_states=5000):
+        print(f"[AGENT] A* Best-First Search (Depth: {max_depth}, Budget: {max_states} states)...")
         
         env = env_class()
         self.state_texts = {}
@@ -31,19 +31,25 @@ class ZorkDeepAgent(SearchAlgorithm):
         self.state_texts[start_hash] = env.get_observation()
         
         # Priority Queue: (-score, depth, path, state_hash, state_obj)
-        # We use negative score because heapq is a min-heap, so higher scores pop first.
+        # Negative score because heapq is a min-heap — higher scores pop first.
         pq = []
         heapq.heappush(pq, (0, 0, [], start_hash, start_state))
         
         best_score_found = 0
+        states_expanded = 0
         
-        while pq:
+        while pq and states_expanded < max_states:
             neg_score, depth, path, curr_hash, curr_state = heapq.heappop(pq)
             current_score = -neg_score
+            states_expanded += 1
             
             if current_score > best_score_found:
                 best_score_found = current_score
-                print(f"[AGENT] New A* Best Score Found: {best_score_found}")
+                print(f"[AGENT] Score ↑ {best_score_found}/350 at depth {depth} ({states_expanded} states)")
+            
+            # Progress logging every 500 states
+            if states_expanded % 500 == 0:
+                print(f"[AGENT] ... {states_expanded}/{max_states} states | Best: {best_score_found}/350 | Queue: {len(pq)}")
                 
             if depth >= max_depth:
                 continue
@@ -68,12 +74,10 @@ class ZorkDeepAgent(SearchAlgorithm):
                     self.known_states.add(next_hash)
                     self.state_texts[next_hash] = obs
                     
-                    # Push to priority queue
-                    # Tie-breaker logic: push depth so earlier nodes are evaluated first if scores are tied
                     heapq.heappush(pq, (-next_score, depth + 1, path + [action], next_hash, next_state))
                     
         env.load_state(start_state)
-        print(f"[AGENT] Exploration Complete. Evaluated {len(self.known_states)} states. Max Score: {best_score_found}")
+        print(f"[AGENT] Done. {states_expanded} expanded, {len(self.known_states)} unique states. Best: {best_score_found}/350")
         
     def search(self, start_env, target_keyword, **kwargs):
         print(f"\n[AGENT] BFS Graph Search over composed hypotheses for: '{target_keyword}'")

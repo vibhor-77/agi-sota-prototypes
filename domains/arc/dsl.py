@@ -62,6 +62,27 @@ def fill_box(grid: Grid, box: BoundingBox, color: int) -> Grid:
     new_grid[box.r_min:box.r_max+1, box.c_min:box.c_max+1] = color
     return Grid(new_grid)
 
+def transpose(grid: Grid) -> Grid:
+    return Grid(grid.arr.T)
+
+def tile(grid: Grid, n_rows: int, n_cols: int) -> Grid:
+    return Grid(np.tile(grid.arr, (n_rows, n_cols)))
+
+def overlay(base: Grid, top: Grid) -> Grid:
+    """Composite two grids: non-zero pixels from top overwrite base."""
+    if base.arr.shape != top.arr.shape:
+        # Crop to minimum common shape
+        min_r = min(base.arr.shape[0], top.arr.shape[0])
+        min_c = min(base.arr.shape[1], top.arr.shape[1])
+        b = base.arr[:min_r, :min_c].copy()
+        t = top.arr[:min_r, :min_c]
+    else:
+        b = base.arr.copy()
+        t = top.arr
+    mask = t != 0
+    b[mask] = t[mask]
+    return Grid(b)
+
 # --- Abstract Syntax Tree (Composability) ---
 class ASTNode:
     def evaluate(self, env): pass
@@ -150,14 +171,33 @@ class FillBoxNode(ASTNode):
     def evaluate(self, env): return fill_box(self.g.evaluate(env), self.b.evaluate(env), self.c.evaluate(env))
     def __str__(self): return f"fill_box({self.g}, {self.b}, {self.c})"
 
+class TransposeNode(ASTNode):
+    def __init__(self, grid_node): self.grid_node = grid_node
+    def evaluate(self, env): return transpose(self.grid_node.evaluate(env))
+    def __str__(self): return f"transpose({self.grid_node})"
+
+class TileNode(ASTNode):
+    def __init__(self, grid_node, rows_node, cols_node):
+        self.g, self.r, self.c = grid_node, rows_node, cols_node
+    def evaluate(self, env): return tile(self.g.evaluate(env), self.r.evaluate(env), self.c.evaluate(env))
+    def __str__(self): return f"tile({self.g}, {self.r}, {self.c})"
+
+class OverlayNode(ASTNode):
+    def __init__(self, base_node, top_node):
+        self.base, self.top = base_node, top_node
+    def evaluate(self, env): return overlay(self.base.evaluate(env), self.top.evaluate(env))
+    def __str__(self): return f"overlay({self.base}, {self.top})"
+
 class ARCGrammar(ActionGrammar):
     """
     Pillar 3: Abstraction & Composability.
     Provides the rules for generating nested functional expressions (Programs).
+    13 primitives: rotate, mirror_x/y, transpose, crop, paint, replace_color, pad, fill, tile, overlay.
     """
     @property
     def primitives(self):
-        return [rotate90, mirror_x, mirror_y, get_objects, filter_by_color, crop_to_box, paint_objects, replace_color, pad, fill_box]
+        return [rotate90, mirror_x, mirror_y, transpose, get_objects, filter_by_color,
+                crop_to_box, paint_objects, replace_color, pad, fill_box, tile, overlay]
         
     def compose(self, return_type, max_depth=3):
         return self._generate_typed_program(return_type, max_depth)
@@ -166,15 +206,19 @@ class ARCGrammar(ActionGrammar):
         if return_type == 'Grid':
             if max_depth <= 1:
                 return IdentityGridNode()
+            # 13 grid-producing options with ~equal weight
             r = random.random()
-            if r < 0.1: return IdentityGridNode()
-            elif r < 0.2: return Rotate90Node(self._generate_typed_program('Grid', max_depth-1))
-            elif r < 0.3: return MirrorXNode(self._generate_typed_program('Grid', max_depth-1))
-            elif r < 0.4: return MirrorYNode(self._generate_typed_program('Grid', max_depth-1))
-            elif r < 0.5: return CropToBoxNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Box', max_depth-1))
-            elif r < 0.6: return ReplaceColorNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Color', max_depth-1), self._generate_typed_program('Color', max_depth-1))
-            elif r < 0.7: return PadNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Int', max_depth-1), self._generate_typed_program('Color', max_depth-1))
-            elif r < 0.8: return FillBoxNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Box', max_depth-1), self._generate_typed_program('Color', max_depth-1))
+            if r < 0.08: return IdentityGridNode()
+            elif r < 0.16: return Rotate90Node(self._generate_typed_program('Grid', max_depth-1))
+            elif r < 0.24: return MirrorXNode(self._generate_typed_program('Grid', max_depth-1))
+            elif r < 0.32: return MirrorYNode(self._generate_typed_program('Grid', max_depth-1))
+            elif r < 0.40: return TransposeNode(self._generate_typed_program('Grid', max_depth-1))
+            elif r < 0.48: return CropToBoxNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Box', max_depth-1))
+            elif r < 0.56: return ReplaceColorNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Color', max_depth-1), self._generate_typed_program('Color', max_depth-1))
+            elif r < 0.64: return PadNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Int', max_depth-1), self._generate_typed_program('Color', max_depth-1))
+            elif r < 0.72: return FillBoxNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Box', max_depth-1), self._generate_typed_program('Color', max_depth-1))
+            elif r < 0.80: return TileNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Int', max_depth-1), self._generate_typed_program('Int', max_depth-1))
+            elif r < 0.88: return OverlayNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Grid', max_depth-1))
             else: return PaintNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('ObjectList', max_depth-1), self._generate_typed_program('Color', max_depth-1))
         elif return_type == 'ObjectList':
             if max_depth <= 1 or random.random() < 0.5:
@@ -186,5 +230,5 @@ class ARCGrammar(ActionGrammar):
         elif return_type == 'Box':
             return GetBoundingBoxNode(self._generate_typed_program('ObjectList', max_depth-1))
         elif return_type == 'Int':
-            # specifically for padding sizes
             return ColorNode(random.choice([1, 2, 3]))
+
