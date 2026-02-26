@@ -41,9 +41,11 @@ class ARCEnvironment(Environment):
             pass # Invalid operations just leave the state unchanged
         return self.current_grid
 
-def generate_2d_arc_task(n_examples=3):
+def generate_2d_arc_task(n_examples=3, level=3):
     """
-    Task: Find the blue block, crop the grid to its bounding box, rotate 90 degrees, and paint it green.
+    Level 1: Find blue block, paint it green.
+    Level 2: Find blue block, crop to it, paint it green.
+    Level 3: Find blue block, crop to it, rotate 90 degrees, paint it green.
     """
     examples = []
     for _ in range(n_examples):
@@ -59,12 +61,19 @@ def generate_2d_arc_task(n_examples=3):
         blue_mask = (inp == 1)
         if not np.any(blue_mask): continue
             
-        rows, cols = np.where(blue_mask)
-        cropped = inp[np.min(rows):np.max(rows)+1, np.min(cols):np.max(cols)+1]
-        
-        rotated = np.rot90(cropped)
-        out = np.copy(rotated)
-        out[out == 1] = 3
-        
+        if level == 1:
+            out = np.copy(inp)
+            out[out == 1] = 3
+        else:
+            rows, cols = np.where(blue_mask)
+            cropped = inp[np.min(rows):np.max(rows)+1, np.min(cols):np.max(cols)+1]
+            if level == 2:
+                out = np.copy(cropped)
+                out[out == 1] = 3
+            else:
+                rotated = np.rot90(cropped)
+                out = np.copy(rotated)
+                out[out == 1] = 3
+                
         examples.append((Grid(inp), Grid(out)))
     return examples
