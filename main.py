@@ -23,17 +23,26 @@ def run_zork_interactive(level):
     print(f"INITIAL STATE:\n{start_obs}\n")
     
     print("[AGENT] Exploring phase using BFS abstraction graph building...")
-    # Dynamic depth based on level (1: shallow, 3: deep)
-    depth = {1: 4, 2: 6, 3: 10}[level]
-    
+    # Dynamic goals based on level for true Zork 1 ROM
+    if level == 1:
+        depth = 2
+        goal = "leaflet"
+    elif level == 2:
+        depth = 4
+        goal = "kitchen"
+    else:
+        depth = 6
+        goal = "sword"
+        
     t0 = time.time()
-    agent.explore_world(lambda: ZorkSOTAEnvironment(level=level), max_depth=depth)
+    # Pass the actual instantiated env instead of a lambda to save memory creation
+    agent.explore_world(lambda: env, max_depth=depth)
     t1 = time.time()
     
     print(f"[*] Discovered {len(agent.known_states)} unique states in {t1-t0:.2f}s.\n")
     
-    print("[AGENT] Planning path to 'picked up the gold'...")
-    winning_actions = agent.search(start_obs, target_keyword="picked up the gold")
+    print(f"[AGENT] Planning path to '{goal}'...")
+    winning_actions = agent.search(env, target_keyword=goal)
     
     if winning_actions:
         print("\n>>> DEDUCED WINNING PLAN:")
@@ -45,7 +54,8 @@ def run_zork_interactive(level):
         for a in winning_actions:
             print(f" > USER: {a}")
             sem = parser.parse(a)
-            obs = fresh_env.execute_action(sem)
+            # We skip parser formatting and pass string directly for true Jericho
+            obs = fresh_env.step_raw(a)
             print(f" > ZORK: {obs}")
             time.sleep(0.5) # Slight pause for interactive feel
             
@@ -58,9 +68,8 @@ def run_arc_interactive(level):
     print(f" ARC AGI: LEVEL {level} INTERACTIVE DEMO")
     print(f" {'='*50}\n")
     
-    examples = generate_2d_arc_task(4, level=level)
-    train_ex = examples[:3]
-    test_ex = examples[3]
+    train_ex, test_tests = generate_2d_arc_task(level=level)
+    test_ex = test_tests[0] # Just evaluate on the first test case
     
     print(">>> OBSERVING TRAINING GRIDS")
     for i, (inp, out) in enumerate(train_ex):
@@ -107,16 +116,26 @@ def run_benchmarks(domain, level, trials):
     total_time = 0.0
     
     if domain == "zork":
-        depth = {1: 4, 2: 6, 3: 10}[level]
+        if level == 1:
+            depth = 2
+            goal = "leaflet"
+        elif level == 2:
+            depth = 4
+            goal = "kitchen"
+        else:
+            depth = 6
+            goal = "sword"
+            
         for i in range(trials):
             t0 = time.time()
             env = ZorkSOTAEnvironment(level=level)
             agent = ZorkDeepAgent()
+            
             # Suppress prints for pure benching
             import sys, os
             sys.stdout = open(os.devnull, 'w')
-            agent.explore_world(lambda: ZorkSOTAEnvironment(level=level), max_depth=depth)
-            plan = agent.search(env.get_observation(), target_keyword="picked up the gold")
+            agent.explore_world(lambda: env, max_depth=depth)
+            plan = agent.search(env, target_keyword=goal)
             sys.stdout = sys.__stdout__
             
             t1 = time.time()
@@ -130,9 +149,8 @@ def run_benchmarks(domain, level, trials):
                 
     elif domain == "arc":
         for i in range(trials):
-            examples = generate_2d_arc_task(4, level=level)
-            train_ex = examples[:3]
-            test_ex = examples[3]
+            train_ex, test_tests = generate_2d_arc_task(level=level)
+            test_ex = test_tests[0]
             
             agent = ARCBeamSearch()
             
