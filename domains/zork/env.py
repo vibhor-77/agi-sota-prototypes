@@ -26,6 +26,9 @@ class ZorkSOTAEnvironment(Environment):
     def get_observation(self):
         return self.last_obs
 
+    def get_score(self):
+        return self.env.get_score()
+
     def get_state(self):
         return self.env.get_state()
         

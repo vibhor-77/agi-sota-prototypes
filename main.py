@@ -1,5 +1,10 @@
 import argparse
 import time
+import warnings
+import logging
+
+warnings.filterwarnings("ignore")
+logging.getLogger("urllib3").setLevel(logging.ERROR)
 
 # Zork
 from domains.zork.env import ZorkSOTAEnvironment
@@ -116,16 +121,7 @@ def run_benchmarks(domain, level, trials):
     total_time = 0.0
     
     if domain == "zork":
-        if level == 1:
-            depth = 2
-            goal = "leaflet"
-        elif level == 2:
-            depth = 4
-            goal = "kitchen"
-        else:
-            depth = 6
-            goal = "sword"
-            
+        print(">>> RUNNING TRUE BASELINE EVALUATION (Max Depth BFS)")
         for i in range(trials):
             t0 = time.time()
             env = ZorkSOTAEnvironment(level=level)
@@ -134,22 +130,30 @@ def run_benchmarks(domain, level, trials):
             # Suppress prints for pure benching
             import sys, os
             sys.stdout = open(os.devnull, 'w')
-            agent.explore_world(lambda: env, max_depth=depth)
-            plan = agent.search(env, target_keyword=goal)
+            # BFS explores to a bounded depth before evaluating maximum score
+            agent.explore_world(lambda: env, max_depth=5)
             sys.stdout = sys.__stdout__
+            
+            import pickle
+            max_score = 0
+            for state_hash in agent.known_states:
+                try:
+                    env.load_state(pickle.loads(state_hash))
+                    max_score = max(max_score, env.get_score())
+                except Exception:
+                    pass
+            env.env.reset()
             
             t1 = time.time()
             total_time += (t1 - t0)
+            success_count += max_score
             
-            if plan:
-                success_count += 1
-                print(f"Trial {i+1}/{trials} | SUCCESS | Time: {t1-t0:.3f}s | Path Depth: {len(plan)}")
-            else:
-                print(f"Trial {i+1}/{trials} | FAILED  | Time: {t1-t0:.3f}s")
+            print(f"Trial {i+1}/{trials} | COMPLETED | Max Score Found: {max_score}/350 | Time: {t1-t0:.3f}s | States Explored: {len(agent.known_states)}")
                 
     elif domain == "arc":
+        print(">>> RUNNING TRUE BASELINE EVALUATION (Random 400 Official Tasks)")
         for i in range(trials):
-            train_ex, test_tests = generate_2d_arc_task(level=level)
+            train_ex, test_tests = generate_2d_arc_task(level=level, official_benchmark=True)
             test_ex = test_tests[0]
             
             agent = ARCBeamSearch()
@@ -171,12 +175,16 @@ def run_benchmarks(domain, level, trials):
                     continue
             print(f"Trial {i+1}/{trials} | FAILED  | Time: {t1-t0:.3f}s")
             
-    success_rate = (success_count / trials) * 100
     avg_time = total_time / trials
-    print(f"\n=== BENCHMARK RESULTS ===")
-    print(f"Overall Success Rate: {success_rate:.1f}% ({success_count}/{trials})")
-    print(f"Average CPU Time:     {avg_time:.3f}s per trial")
-    print("=========================")
+    print(f"\n=== TRUE BASELINE RESULTS ===")
+    if domain == "arc":
+        success_rate = (success_count / trials) * 100
+        print(f"Full Dataset Success Rate: {success_rate:.1f}% ({success_count}/{trials})")
+    elif domain == "zork":
+        avg_score = success_count / trials
+        print(f"Average Episode Score:     {avg_score:.1f}/350")
+    print(f"Average CPU Time:          {avg_time:.3f}s per trial")
+    print("=============================")
 
 
 if __name__ == "__main__":

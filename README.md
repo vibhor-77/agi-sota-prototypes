@@ -68,7 +68,7 @@ The repository boasts a pristine standard of Code Quality. Every utility, heuris
 
 ```bash
 # Run the 27 comprehensive tests
-python -m unittest discover tests/
+python -m unittest discover -s tests -t .
 ```
 
 ---

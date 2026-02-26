@@ -59,24 +59,31 @@ def load_official_arc_task(filepath):
         
     return train_ex, test_ex
 
-def generate_2d_arc_task(level=3):
+def generate_2d_arc_task(level=3, official_benchmark=False):
     """
     Loads specific solvable official ARC-AGI JSON tasks to demonstrate the SOTA.
     """
-    # Level 1: Simple Crop (be94b721.json)
-    # Level 2: Mirror X (68b16354.json)
-    # Level 3: Complex Rotation & Mirror (74dd1130.json)
-    
-    file_map = {
-        1: "be94b721.json",
-        2: "68b16354.json",
-        3: "74dd1130.json"
-    }
-    
-    filename = file_map.get(level, "74dd1130.json")
-    target_file = os.path.join("data", "ARC-AGI", "data", "training", filename)
-    
-    if not os.path.exists(target_file):
-        raise FileNotFoundError(f"ARC data not found at {target_file}. Run: git clone https://github.com/fchollet/ARC-AGI.git data/ARC-AGI")
+    if official_benchmark:
+        data_dir = os.path.join("data", "ARC-AGI", "data", "training")
+        if not os.path.exists(data_dir):
+            raise FileNotFoundError(f"ARC data not found at {data_dir}. Run: git clone https://github.com/fchollet/ARC-AGI.git data/ARC-AGI")
+        all_files = glob.glob(os.path.join(data_dir, "*.json"))
+        target_file = random.choice(all_files)
+    else:
+        # Level 1: Simple Crop (be94b721.json)
+        # Level 2: Mirror X (68b16354.json)
+        # Level 3: Complex Rotation & Mirror (74dd1130.json)
+        
+        file_map = {
+            1: "be94b721.json",
+            2: "68b16354.json",
+            3: "74dd1130.json"
+        }
+        
+        filename = file_map.get(level, "74dd1130.json")
+        target_file = os.path.join("data", "ARC-AGI", "data", "training", filename)
+        
+        if not os.path.exists(target_file):
+            raise FileNotFoundError(f"ARC data not found at {target_file}. Run: git clone https://github.com/fchollet/ARC-AGI.git data/ARC-AGI")
         
     return load_official_arc_task(target_file)
