@@ -167,7 +167,22 @@ def mutate_universal(program: Program, library) -> Program:
         return prog
     
     # Replace a random subtree with a fresh random program
-    return library.compose_random(getattr(program, '_output_type', 'Grid'), max_depth=4)
+    applies = [n for n in nodes if isinstance(n, Apply) and n.arg_nodes]
+    if applies:
+        target = random.choice(applies)
+        idx = random.randrange(len(target.arg_nodes))
+        # Ensure we maintain type correctness
+        old_arg = target.arg_nodes[idx]
+        output_type = getattr(old_arg, '_output_type', 'Grid')
+        if isinstance(old_arg, Constant):
+            output_type = old_arg.type_name
+        elif isinstance(old_arg, Variable):
+            output_type = old_arg.type_name
+        elif isinstance(old_arg, Apply) and hasattr(old_arg.fn_node, 'output_type'):
+            output_type = old_arg.fn_node.output_type
+            
+        target.arg_nodes[idx] = library.compose_random(output_type, max_depth=3)
+    return prog
 
 
 def crossover_universal(parent_a: Program, parent_b: Program) -> Program:
@@ -184,6 +199,9 @@ def crossover_universal(parent_a: Program, parent_b: Program) -> Program:
         target = random.choice(a_applies)
         donor = random.choice(b_nodes)
         idx = random.randrange(len(target.arg_nodes))
-        target.arg_nodes[idx] = copy.deepcopy(donor)
+        
+        # Enforce max depth to prevent infinitely growing trees and deepcopy stack overflows
+        if a.depth() + donor.depth() < 12:
+            target.arg_nodes[idx] = copy.deepcopy(donor)
     
     return a

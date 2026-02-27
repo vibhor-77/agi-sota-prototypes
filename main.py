@@ -450,8 +450,9 @@ def run_wake_sleep(domain, levels, rounds, beam_width=None, max_gens=None, verbo
             # WAKE PHASE: Solving tasks
             print("[WAKE] Solving tasks...")
             for level in levels:
-                # generate a task for this level
-                train_ex, test_tests = generate_2d_arc_task(level=level, official_benchmark=True)
+                # generate a curriculum task for this level (False) instead of random ARC tasks (True)
+                # to guarantee they contain compressible geometric patterns.
+                train_ex, test_tests = generate_2d_arc_task(level=level, official_benchmark=False)
                 test_ex = test_tests[0]
                 eval_fn = make_arc_eval_fn(train_ex)
                 
