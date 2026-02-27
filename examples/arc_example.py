@@ -13,11 +13,11 @@ def main():
     print("==================================\n")
 
     print("[1] The AGI views the world as a structured Grid.\n")
-    # We present a 3x3 grid
+    # We present an asymmetric 3x3 grid
     initial_state = Grid([
-        [1, 0, 0],
-        [0, 1, 0],
-        [0, 0, 2]
+        [1, 2, 3],
+        [4, 5, 6],
+        [7, 8, 9]
     ])
 
     print("--- Original Grid ---")
@@ -35,9 +35,9 @@ def main():
     print("\n--- After 'mirror_x' ---")
     print(mirrored.arr)
 
-    # 3. Replace color 1 with color 4 (Yellow)
-    final = replace_color(mirrored, 1, 4)
-    print("\n--- After 'replace_color(1 -> 4)' ---")
+    # 3. Replace color 7 with color 0 (Black)
+    final = replace_color(mirrored, 7, 0)
+    print("\n--- After 'replace_color(7 -> 0)' ---")
     print(final.arr)
 
     print("\n🚀 INSIGHT:")
