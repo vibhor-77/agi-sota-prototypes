@@ -102,11 +102,11 @@ python main.py interactive --domain arc --level 3 --verbose
 
 ---
 
-## Reproducing the ~10% and ~40% ARC Benchmarks 🏆
+## Reproducing the ~10% ARC Benchmark 🏆
 
-When pushing the system to its computational limits on the official ARC-AGI Training Set, you will observe two very distinct generalization ceilings based on the Pillar architecture used.
+When pushing the system to its computational limits on the official ARC-AGI Training Set, you will quickly observe the biological limits of pure combinatorial search.
 
-### The ~10% Floor: Pure Beam Search
+### The ~10% Baseline: Pure Beam Search
 Running the strict, domain-specific `ARCBeamSearch` algorithm perfectly illustrates the mathematical threshold of brute-force combinatorics natively running without *Abstraction* learning. Due to the exponential tree size of 19 primitives, the agent typically solves exactly **9.5% to 10%** of the 400 training tasks.
 
 To reproduce this baseline (utilizing `multiprocessing.Pool` across all CPU cores):
@@ -114,18 +114,18 @@ To reproduce this baseline (utilizing `multiprocessing.Pool` across all CPU core
 python main.py benchmark --domain arc --trials 400 --beam-width 500 --max-gens 100
 ```
 
-### The ~40% Ceiling: Wake-Sleep Library Learning
-The **~40% exact-match solution rate** is unlocked strictly when evaluating the `UniversalSolver` using its persistent **Wake-Sleep Library Learning** sequence across targeted sampling rounds. 
+### Extending with Wake-Sleep Library Learning
+To demonstrate the *Abstraction* pillar, the `UniversalSolver` uses a **Wake-Sleep Library Learning** sequence. 
 
-By identifying recurring geometric subtrees during the "sleep" phase and permanently binding them into the dictionary (e.g., `learned_1 = flip_y(rotate90(input_grid))`), the AGI fundamentally shrinks the combinatorial search horizon. As the library compounds over dozens of cycles, the solver bypasses the 10% combinatorics barrier and frequently solves up to 40% of small 10-20 task evaluation batches!
+By identifying recurring geometric subtrees during the "sleep" phase and permanently binding them into the runtime dictionary (e.g., `learned_1 = flip_y(rotate90(input_grid))`), the AGI fundamentally shrinks the combinatorial search horizon for specific task distributions. Note that while this demonstrates program compression, **it does not magically solve the entire ARC zero-shot unseen benchmark**. It simply enables solving subsets of tasks that share geometric compositions faster.
 
-**Is this legit?**
-Yes, but comes with profound scientific caveats regarding AGI realities:
-1. **Public Training Set Limit:** It demonstrates memorization/compression of the visible training set tasks. True unseen zero-shot evaluation on the hidden validation distribution remains severely lower.
+**Is this pure AGI?**
+No, this is a prototype with profound scientific caveats regarding AGI realities:
+1. **Public Training Set Limit:** It demonstrations memorization/compression of the visible training set tasks. True unseen zero-shot evaluation on the hidden distribution remains severely lower.
 2. **Prior Knowledge Injection:** The foundational 19-primitive discrete language was cleanly injected via human geometry priors.
-3. **Pure Symbolic Threshold:** While wake-sleep scaling expands the ceiling, eventually the architecture hits a wall. Breaking upward towards 80%+ demands explicitly using Deep Learning (LLMs/Vision-Language Models) as a heuristic prior to actively guide spatial hypothesis generation *before* expanding the logic tree.
+3. **Pure Symbolic Threshold:** Break upward towards generalized human-level 80%+ demands explicitly using Deep Learning (LLMs/Vision-Language Models) as a heuristic prior to actively guide spatial hypothesis generation *before* expanding the logic tree. Symbolic search alone hits a combinatorics wall.
 
-**See Wake-Sleep scaling in action:**
+**See Wake-Sleep scaling on a geometric curriculum:**
 ```bash
 python main.py wake-sleep --domain arc --rounds 5 --levels 1 2 3 --library-path library.json
 ```
