@@ -57,16 +57,7 @@ class ARCBeamSearch(SearchAlgorithm):
                 
             for gen in range(max_generations):
                 beam.sort(key=lambda x: x[0])
-                
-                # De-duplicate: remove programs with identical str() to maintain diversity
-                seen_strs = set()
-                unique_beam = []
-                for score, prog in beam:
-                    prog_str = str(prog)
-                    if prog_str not in seen_strs:
-                        seen_strs.add(prog_str)
-                        unique_beam.append((score, prog))
-                beam = unique_beam[:beam_width]
+                beam = beam[:beam_width]
                 
                 best_loss = beam[0][0]
                 best_prog = beam[0][1]  # Elitism: always preserve the #1
