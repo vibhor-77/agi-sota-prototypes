@@ -30,7 +30,7 @@ def main():
     print("\n--- After 'rotate90' ---")
     print(rotated.arr)
 
-    # 2. Mirror it across the X-axis
+    # 2. Flip the grid vertically (up-down)
     mirrored = flip_y(rotated)
     print("\n--- After 'flip_y' ---")
     print(mirrored.arr)
