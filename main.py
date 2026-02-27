@@ -204,10 +204,14 @@ def _run_zork_trial(args):
 
 def _run_arc_trial(args):
     """Single ARC trial — must be top-level for ProcessPoolExecutor."""
-    level, beam_width, max_gens, verbose = args
+    level, beam_width, max_gens, verbose, trial_id, total_trials = args
     import time, sys, os
-    train_ex, test_tests = generate_2d_arc_task(level=level, official_benchmark=True)
+    train_ex, test_tests, task_id = generate_2d_arc_task(level=level, official_benchmark=True, return_id=True)
     test_ex = test_tests[0]
+    
+    # Print start of trial to show progress
+    print(f"  [START] Trial {trial_id}/{total_trials} | Task: {task_id}")
+    sys.stdout.flush() # Ensure it prints immediately in multiprocessing
     
     agent = ARCBeamSearch()
     
@@ -248,9 +252,10 @@ def _run_arc_trial(args):
             else:
                 diag = f"loss={final_loss:.4f}, shape {predicted.arr.shape} vs {test_ex[1].arr.shape}"
     
+    status = "SUCCESS" if success else "FAILED"
+    print(f"  [FINISH] Trial {trial_id}/{total_trials} | {status} | Task: {task_id} | Time: {t1-t0:.2f}s")
+    sys.stdout.flush()
     return success, t1 - t0, ast_str, final_loss, diag
-
-
 
 def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=None, max_gens=None, verbose=False):
     import multiprocessing
@@ -294,32 +299,35 @@ def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=
         bw = beam_width if beam_width is not None else 200
         gens = max_gens if max_gens is not None else 50
         print(f">>> {'VERBOSE ' if verbose else ''}EVALUATION (Beam: {bw}, Gens: {gens})")
+        print(f">>> Processing {trials} trials across {min(workers, trials)} parallel workers...")
         
-        trial_args = [(level, bw, gens, verbose)] * trials
+        trial_args = [(level, bw, gens, verbose, i+1, trials) for i in range(trials)]
         effective_workers = min(workers, trials)
         with ProcessPoolExecutor(max_workers=effective_workers) as executor:
             results = list(executor.map(_run_arc_trial, trial_args))
         
         success_count = 0
         total_time = 0.0
+        
+        print(f"\n{'='*20} DETAILED RESULTS {'='*20}")
         for i, (success, elapsed, ast_str, final_loss, diag) in enumerate(results):
             total_time += elapsed
             if success:
                 success_count += 1
-                print(f"Trial {i+1}/{trials} | SUCCESS | Time: {elapsed:.3f}s | AST: {ast_str}")
+                print(f"Trial {i+1:3d}/{trials} | SUCCESS | Time: {elapsed:5.2f}s | AST: {ast_str[:100]}{'...' if len(ast_str)>100 else ''}")
             else:
                 if verbose and ast_str:
-                    print(f"Trial {i+1}/{trials} | FAILED  | Time: {elapsed:.3f}s | {diag} | Best: {ast_str}")
+                    print(f"Trial {i+1:3d}/{trials} | FAILED  | Time: {elapsed:5.2f}s | {diag} | Best: {ast_str[:100]}{'...' if len(ast_str)>100 else ''}")
                 else:
-                    print(f"Trial {i+1}/{trials} | FAILED  | Time: {elapsed:.3f}s")
+                    print(f"Trial {i+1:3d}/{trials} | FAILED  | Time: {elapsed:5.2f}s")
         
         success_rate = (success_count / trials) * 100
         avg_time = total_time / trials
-        wall_time = max(r[1] for r in results)
-        print(f"\n=== RESULTS ===")
+        wall_time = max(r[1] for r in results) if results else 0
+        print(f"\n=== SUMMARY ===")
         print(f"Full Dataset Success Rate: {success_rate:.1f}% ({success_count}/{trials})")
         print(f"Average CPU Time:          {avg_time:.3f}s per trial")
-        print(f"Wall Clock Time:           {wall_time:.3f}s (parallel)")
+        print(f"Wall Clock Time:           {wall_time:.3f}s (parallel execution)")
         print("===============")
 
 

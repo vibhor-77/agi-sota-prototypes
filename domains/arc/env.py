@@ -59,7 +59,7 @@ def load_official_arc_task(filepath):
         
     return train_ex, test_ex
 
-def generate_2d_arc_task(level=3, official_benchmark=False):
+def generate_2d_arc_task(level=3, official_benchmark=False, return_id=False):
     """
     Loads specific solvable official ARC-AGI JSON tasks to demonstrate the SOTA.
     """
@@ -86,4 +86,8 @@ def generate_2d_arc_task(level=3, official_benchmark=False):
         if not os.path.exists(target_file):
             raise FileNotFoundError(f"ARC data not found at {target_file}. Run: git clone https://github.com/fchollet/ARC-AGI.git data/ARC-AGI")
         
-    return load_official_arc_task(target_file)
+    train_ex, test_ex = load_official_arc_task(target_file)
+    if return_id:
+        task_id = os.path.basename(target_file)
+        return train_ex, test_ex, task_id
+    return train_ex, test_ex
