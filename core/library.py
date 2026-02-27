@@ -185,3 +185,124 @@ class PrimitiveLibrary:
             for name, lp in self.learned.items():
                 lines.append(f"    {name} (used {lp.usage_count}x): {lp.body}")
         return '\n'.join(lines)
+    
+    def save(self, path: str):
+        """
+        Save learned primitives to disk (JSON).
+        Only saves learned primitives — built-in primitives are re-registered by the adapter.
+        """
+        import json, os
+        os.makedirs(os.path.dirname(path) if os.path.dirname(path) else '.', exist_ok=True)
+        
+        data = {
+            'version': 1,
+            'learned_count': len(self.learned),
+            'primitives': []
+        }
+        for name, lp in self.learned.items():
+            data['primitives'].append({
+                'name': name,
+                'body_str': str(lp.body),
+                'body_program': _serialize_program(lp.body),
+                'output_type': lp.output_type,
+                'input_vars': lp.input_vars,
+                'usage_count': lp.usage_count,
+            })
+        
+        with open(path, 'w') as f:
+            json.dump(data, f, indent=2)
+    
+    def load(self, path: str) -> int:
+        """
+        Load learned primitives from disk and register them.
+        Returns the number of primitives loaded.
+        """
+        import json, os
+        if not os.path.exists(path):
+            return 0
+        
+        with open(path) as f:
+            data = json.load(f)
+        
+        loaded = 0
+        for entry in data.get('primitives', []):
+            name = entry['name']
+            if name in self.learned:
+                continue  # Already loaded
+            
+            # Reconstruct the program tree from serialized form
+            body = _deserialize_program(entry['body_program'], self)
+            if body is None:
+                continue
+            
+            learned = LearnedPrimitive(
+                name=name,
+                body=body,
+                input_vars=entry.get('input_vars', []),
+                output_type=entry.get('output_type', 'Grid')
+            )
+            learned.usage_count = entry.get('usage_count', 0)
+            self.learned[name] = learned
+            
+            # Register for future compositions
+            out_type = entry.get('output_type', 'Grid')
+            if out_type not in self.type_index:
+                self.type_index[out_type] = []
+            if name not in self.type_index[out_type]:
+                self.type_index[out_type].append(name)
+            self.primitives[name] = Primitive(
+                name, lambda env, _lp=learned: _lp.execute(env), [], out_type
+            )
+            loaded += 1
+        
+        return loaded
+
+
+def _serialize_program(prog: Program) -> dict:
+    """Recursively serialize a Program tree to a JSON-safe dict."""
+    if isinstance(prog, Variable):
+        return {'type': 'Variable', 'name': prog.name, 'type_name': prog.type_name}
+    elif isinstance(prog, Constant):
+        return {'type': 'Constant', 'value': prog.value, 'type_name': prog.type_name}
+    elif isinstance(prog, Primitive):
+        return {'type': 'Primitive', 'name': prog.name}
+    elif isinstance(prog, Apply):
+        return {
+            'type': 'Apply',
+            'fn': _serialize_program(prog.fn_node),
+            'args': [_serialize_program(a) for a in prog.arg_nodes]
+        }
+    elif isinstance(prog, LearnedPrimitive):
+        return {'type': 'Learned', 'name': prog.name, 'body': _serialize_program(prog.body)}
+    return {'type': 'Unknown'}
+
+
+def _deserialize_program(data: dict, library: 'PrimitiveLibrary') -> Optional[Program]:
+    """Reconstruct a Program tree from serialized dict."""
+    if data is None:
+        return None
+    
+    t = data.get('type')
+    if t == 'Variable':
+        return Variable(data['name'], data.get('type_name', 'Any'))
+    elif t == 'Constant':
+        return Constant(data['value'], data.get('type_name', 'Int'))
+    elif t == 'Primitive':
+        name = data['name']
+        if name in library.primitives:
+            return library.primitives[name]
+        return None
+    elif t == 'Apply':
+        fn = _deserialize_program(data['fn'], library)
+        if fn is None:
+            return None
+        args = [_deserialize_program(a, library) for a in data.get('args', [])]
+        if None in args:
+            return None
+        return Apply(fn, args)
+    elif t == 'Learned':
+        body = _deserialize_program(data.get('body'), library)
+        if body is None:
+            return None
+        return LearnedPrimitive(data['name'], body, [], 'Grid')
+    return None

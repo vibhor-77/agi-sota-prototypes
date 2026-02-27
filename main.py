@@ -395,6 +395,88 @@ def run_universal(domain, level, trials, beam_width=None, max_gens=None,
         print("[UNIVERSAL] (Zork's state-based exploration doesn't map to program synthesis)")
         print("[UNIVERSAL] Use: python main.py benchmark --domain zork --level 2")
 
+def run_wake_sleep(domain, levels, rounds, beam_width=None, max_gens=None, verbose=False, library_path="library.json"):
+    """Wake-Sleep Training Loop: iteratively solves tasks and learns primitives."""
+    from core.solver import UniversalSolver
+    
+    bw = beam_width if beam_width is not None else 200
+    gens = max_gens if max_gens is not None else 50
+    
+    print(f"\n{'='*70}")
+    print(f" WAKE-SLEEP TRAINING ({domain.upper()}) | Rounds: {rounds} | Levels: {levels}")
+    print(f" Beam: {bw} | Gens: {gens} | Lib: {library_path}")
+    print(f"{'='*70}\n")
+    
+    if domain == "arc":
+        from domains.arc.adapter import create_arc_library, make_arc_eval_fn
+        from domains.arc.env import ARCEnvironment
+        import os
+        
+        library = create_arc_library()
+        
+        # Load accumulated library from previous runs
+        if os.path.exists(library_path):
+            n_loaded = library.load(library_path)
+            print(f"[INIT] Loaded {n_loaded} learned primitives from {library_path}.")
+        
+        solver = UniversalSolver(library)
+        
+        for round_idx in range(1, rounds + 1):
+            print(f"\n--- ROUND {round_idx}/{rounds} ---")
+            success_count = 0
+            
+            # WAKE PHASE: Solving tasks
+            print("[WAKE] Solving tasks...")
+            for level in levels:
+                # generate a task for this level
+                train_ex, test_tests = generate_2d_arc_task(level=level, official_benchmark=True)
+                test_ex = test_tests[0]
+                eval_fn = make_arc_eval_fn(train_ex)
+                
+                t0 = time.time()
+                best_prog, best_loss = solver.solve(
+                    eval_fn, output_type='Grid',
+                    beam_width=bw, max_generations=gens, verbose=verbose
+                )
+                elapsed = time.time() - t0
+                
+                # Check generalization
+                success = False
+                if best_loss == 0.0:
+                    try:
+                        test_pred = best_prog.execute({'input_grid': test_ex[0]})
+                        if test_pred is not None and hasattr(test_pred, 'arr'):
+                            import numpy as np
+                            success = np.array_equal(test_pred.arr, test_ex[1].arr)
+                    except Exception:
+                        pass
+                
+                if success:
+                    success_count += 1
+                    print(f"  Level {level} | SUCCESS | {elapsed:.1f}s | {best_prog}")
+                else:
+                    print(f"  Level {level} | FAILED  | {elapsed:.1f}s | loss={best_loss:.4f}")
+            
+            print(f"[WAKE] Round {round_idx} Complete. Successes: {success_count}/{len(levels)}")
+            
+            # SLEEP PHASE: Library Learning
+            print("\n[SLEEP] Conceptualizing new primitives...")
+            new_prims = solver.learn(verbose=True)
+            if new_prims:
+                print(f"[SLEEP] Library grew: +{len(new_prims)} primitives")
+            else:
+                print("[SLEEP] No new primitives discovered.")
+            
+            # Save the updated library
+            library.save(library_path)
+            print(f"[SLEEP] Saved library to {library_path}.")
+            
+            # Clear solved programs for the next round so we don't re-learn the same things
+            solver.solved_programs.clear()
+            
+    elif domain == "zork":
+        print("[WAKE-SLEEP] Zork does not support program synthesis library learning yet.")
+
 
 if __name__ == "__main__":
 
@@ -409,9 +491,9 @@ if __name__ == "__main__":
   python main.py benchmark --domain arc --level 3 --trials 20 --workers 5
   python main.py benchmark --domain zork --level 2 --trials 10 --budget 2000
   python main.py universal --domain arc --level 3 --trials 10 --learn
-  python main.py universal --domain arc --level 3 --trials 5 --verbose
+  python main.py wake-sleep --domain arc --rounds 3 --levels 1 2 3
 """)
-    parser.add_argument("mode", choices=["interactive", "benchmark", "universal"],
+    parser.add_argument("mode", choices=["interactive", "benchmark", "universal", "wake-sleep"],
                         help="Execution mode (universal = domain-agnostic solver)")
     parser.add_argument("--domain", choices=["arc", "zork"], required=True, help="Domain to run")
     parser.add_argument("--level", type=int, choices=[1, 2, 3], default=3, help="Difficulty level (1-3)")
@@ -428,6 +510,12 @@ if __name__ == "__main__":
                         help="Enable detailed logging (room discovery, inventory, per-gen stats)")
     parser.add_argument("--learn", action="store_true",
                         help="Universal mode: perform library learning after solving tasks")
+    parser.add_argument("--rounds", type=int, default=3,
+                        help="Wake-sleep: number of training rounds")
+    parser.add_argument("--levels", type=int, nargs='+', default=[1, 2, 3],
+                        help="Wake-sleep: levels to solve in each round")
+    parser.add_argument("--library-path", type=str, default="library.json",
+                        help="Wake-sleep: path to save/load learned library")
     
     args = parser.parse_args()
     
@@ -445,3 +533,7 @@ if __name__ == "__main__":
         run_universal(args.domain, args.level, args.trials,
                       beam_width=args.beam_width, max_gens=args.max_gens,
                       verbose=args.verbose, learn=args.learn)
+    elif args.mode == "wake-sleep":
+        run_wake_sleep(args.domain, args.levels, args.rounds,
+                       beam_width=args.beam_width, max_gens=args.max_gens,
+                       verbose=args.verbose, library_path=args.library_path)
