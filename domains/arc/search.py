@@ -3,7 +3,7 @@ import random
 import warnings
 from functools import partial
 from core.exploration import SearchAlgorithm
-from domains.arc.dsl import ARCGrammar, mutate_program, crossover
+from domains.arc.dsl import ARCGrammar, mutate_program, mutate_leaves, crossover
 from domains.arc.heuristics import PixelEditDistance
 
 # Suppress pervasive ResourceWarnings from multiprocessing cleanup on some Python versions
@@ -57,9 +57,19 @@ class ARCBeamSearch(SearchAlgorithm):
                 
             for gen in range(max_generations):
                 beam.sort(key=lambda x: x[0])
-                beam = beam[:beam_width]
+                
+                # De-duplicate: remove programs with identical str() to maintain diversity
+                seen_strs = set()
+                unique_beam = []
+                for score, prog in beam:
+                    prog_str = str(prog)
+                    if prog_str not in seen_strs:
+                        seen_strs.add(prog_str)
+                        unique_beam.append((score, prog))
+                beam = unique_beam[:beam_width]
                 
                 best_loss = beam[0][0]
+                best_prog = beam[0][1]  # Elitism: always preserve the #1
                 delta = prev_best - best_loss
                 prev_best = best_loss
                 
@@ -92,8 +102,13 @@ class ARCBeamSearch(SearchAlgorithm):
                 
                 for _ in range(n_children):
                     r = random.random()
-                    if r < 0.60:
-                        # Mutation: refine existing good programs (primary driver)
+                    if best_loss < 0.1 and r < 0.40:
+                        # Targeted leaf mutation: fine-tune color parameters when close
+                        parent = random.choice(top_progs)
+                        new_candidates.append(mutate_leaves(parent))
+                        n_mutate += 1
+                    elif r < 0.60:
+                        # Structural mutation: refine existing good programs
                         parent = random.choice(top_progs)
                         new_candidates.append(mutate_program(parent, self.grammar))
                         n_mutate += 1
@@ -117,4 +132,7 @@ class ARCBeamSearch(SearchAlgorithm):
             beam.sort(key=lambda x: x[0])
             if verbose:
                 print(f"[VERBOSE] Final: loss={beam[0][0]:.4f} | {beam[0][1]}")
-            return beam[0][1]
+            # Elitism: return the best we ever saw
+            if beam[0][0] <= best_loss:
+                return beam[0][1]
+            return best_prog

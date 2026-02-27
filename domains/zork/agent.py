@@ -40,7 +40,7 @@ class ZorkDeepAgent(SearchAlgorithm):
         except Exception:
             start_inv = 0
             start_inv_items = []
-        start_h = start_score * 10 + start_inv * 2 + len(unique_rooms)
+        start_h = start_score * 10 + start_inv * 5 + len(unique_rooms)
         
         if verbose:
             print(f"[VERBOSE] Start state: score={start_score}, inventory={start_inv_items}, rooms=1")
@@ -52,6 +52,15 @@ class ZorkDeepAgent(SearchAlgorithm):
         best_game_score = start_score
         states_expanded = 0
         prev_inv_count = start_inv
+        
+        # Semantic dedup: track (room_sig, sorted_inventory) to avoid equivalent states
+        semantic_visited = set()
+        start_room_sig = env.get_observation()[:80]
+        try:
+            start_inv_names = tuple(sorted(str(i) for i in env.get_inventory()))
+        except Exception:
+            start_inv_names = ()
+        semantic_visited.add((start_room_sig, start_inv_names))
         
         while pq and states_expanded < max_states:
             neg_h, depth, path, curr_hash, curr_state = heapq.heappop(pq)
@@ -93,7 +102,7 @@ class ZorkDeepAgent(SearchAlgorithm):
                     if verbose:
                         print(f"[VERBOSE] 🗺️  NEW ROOM at depth {depth+1}: \"{room_sig}...\"")
                     
-                composite_h = next_game_score * 10 + inv_count * 2 + len(unique_rooms)
+                composite_h = next_game_score * 10 + inv_count * 5 + len(unique_rooms)
                 
                 if next_game_score > best_game_score:
                     best_game_score = next_game_score
@@ -113,9 +122,19 @@ class ZorkDeepAgent(SearchAlgorithm):
                 self.world_graph[curr_hash][action] = next_hash
                 
                 if next_hash not in self.known_states:
-                    self.known_states.add(next_hash)
-                    self.state_texts[next_hash] = obs
-                    heapq.heappush(pq, (-composite_h, depth + 1, path + [action], next_hash, next_state))
+                    # Semantic dedup: skip if (room, inventory) already seen
+                    room_sig_next = obs[:80]
+                    try:
+                        inv_names = tuple(sorted(str(i) for i in inv_items))
+                    except Exception:
+                        inv_names = ()
+                    semantic_key = (room_sig_next, inv_names)
+                    
+                    if semantic_key not in semantic_visited:
+                        semantic_visited.add(semantic_key)
+                        self.known_states.add(next_hash)
+                        self.state_texts[next_hash] = obs
+                        heapq.heappush(pq, (-composite_h, depth + 1, path + [action], next_hash, next_state))
                     
         env.load_state(start_state)
         print(f"[AGENT] Done. {states_expanded} expanded, {len(self.known_states)} states, {len(unique_rooms)} rooms. Best: {best_game_score}/350 (h={best_composite})")

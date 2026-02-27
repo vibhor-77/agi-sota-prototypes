@@ -303,6 +303,35 @@ def mutate_program(program, grammar):
     # Replace entire subtree with fresh random
     return grammar.compose('Grid', max_depth=4)
 
+def mutate_leaves(program):
+    """
+    Targeted leaf mutation: walk the AST and randomize exactly one ColorNode value.
+    Preserves the program's structural skeleton for fine-grained parameter tuning.
+    """
+    prog = copy.deepcopy(program)
+    
+    # Collect all ColorNode references in the tree
+    color_nodes = []
+    stack = [prog]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, ColorNode):
+            color_nodes.append(node)
+        # Walk children
+        for attr in ['grid_node', 'grid', 'g', 'base', 'top', 'col', 'c',
+                     'f_col', 't_col', 'objs', 'box', 'b', 'w', 'r',
+                     'factor', 'top_g', 'bottom_g', 'left_g', 'right_g']:
+            child = getattr(node, attr, None)
+            if child is not None and isinstance(child, ASTNode):
+                stack.append(child)
+    
+    if color_nodes:
+        # Mutate exactly one random color leaf
+        target = random.choice(color_nodes)
+        target.color_val = random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    
+    return prog
+
 def crossover(parent_a, parent_b):
     """
     Combine two parent programs by inserting parent_b's grid subtree into parent_a.
