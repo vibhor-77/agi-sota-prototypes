@@ -7,7 +7,7 @@ the UniversalSolver for ARC tasks.
 """
 from core.library import PrimitiveLibrary
 from domains.arc.dsl import (
-    rotate90, mirror_x, mirror_y, transpose,
+    rotate90, flip_y, flip_x, transpose,
     get_objects, filter_by_color, crop_to_box, paint_objects,
     replace_color, pad, fill_box, tile, overlay,
     scale_up, stack_v, stack_h, largest_object,
@@ -25,8 +25,8 @@ def create_arc_library() -> PrimitiveLibrary:
     
     # --- Unary Grid -> Grid primitives ---
     lib.register('rotate90', rotate90, ['Grid'], 'Grid')
-    lib.register('mirror_x', mirror_x, ['Grid'], 'Grid')
-    lib.register('mirror_y', mirror_y, ['Grid'], 'Grid')
+    lib.register('flip_y', flip_y, ['Grid'], 'Grid')
+    lib.register('flip_x', flip_x, ['Grid'], 'Grid')
     lib.register('transpose', transpose, ['Grid'], 'Grid')
     lib.register('largest_object', largest_object, ['Grid'], 'Grid')
     

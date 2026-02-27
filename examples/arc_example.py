@@ -5,7 +5,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from domains.arc.env import Grid
-from domains.arc.dsl import rotate90, mirror_x, replace_color
+from domains.arc.dsl import rotate90, flip_y, replace_color
 
 def main():
     print("\n==================================")
@@ -31,8 +31,8 @@ def main():
     print(rotated.arr)
 
     # 2. Mirror it across the X-axis
-    mirrored = mirror_x(rotated)
-    print("\n--- After 'mirror_x' ---")
+    mirrored = flip_y(rotated)
+    print("\n--- After 'flip_y' ---")
     print(mirrored.arr)
 
     # 3. Replace color 7 with color 0 (Black)

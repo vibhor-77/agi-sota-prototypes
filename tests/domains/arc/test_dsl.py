@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from domains.arc.env import Grid, BoundingBox
 from domains.arc.dsl import (
-    rotate90, mirror_x, mirror_y, get_objects, filter_by_color, crop_to_box, paint_objects,
+    rotate90, flip_y, flip_x, get_objects, filter_by_color, crop_to_box, paint_objects,
     count_color, most_common_color, scale_up, stack_v, stack_h, largest_object,
     ColorNode, GetObjectsNode, CropToBoxNode, Rotate90Node, IdentityGridNode,
     ScaleUpNode, LargestObjectNode, StackVNode, StackHNode, MostCommonColorNode
@@ -26,12 +26,12 @@ class TestARCDSL(unittest.TestCase):
         rot = rotate90(self.grid)
         self.assertTrue(np.array_equal(rot.arr, np.array([[0, 0, 0], [1, 1, 0], [0, 2, 0]])))
 
-    def test_mirror_x(self):
-        mir = mirror_x(self.grid)
+    def test_flip_y(self):
+        mir = flip_y(self.grid)
         self.assertTrue(np.array_equal(mir.arr, np.array([[0, 0, 0], [2, 1, 0], [0, 1, 0]])))
 
-    def test_mirror_y(self):
-        mir = mirror_y(self.grid)
+    def test_flip_x(self):
+        mir = flip_x(self.grid)
         self.assertTrue(np.array_equal(mir.arr, np.array([[0, 1, 0], [0, 1, 2], [0, 0, 0]])))
 
     def test_crop_to_box(self):

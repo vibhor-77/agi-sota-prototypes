@@ -30,10 +30,10 @@ def paint_objects(grid: Grid, objects: list, color: int) -> Grid:
 def rotate90(grid: Grid) -> Grid:
     return Grid(np.rot90(grid.arr))
 
-def mirror_x(grid: Grid) -> Grid:
+def flip_y(grid: Grid) -> Grid:
     return Grid(np.flipud(grid.arr))
 
-def mirror_y(grid: Grid) -> Grid:
+def flip_x(grid: Grid) -> Grid:
     return Grid(np.fliplr(grid.arr))
 
 def get_bounding_box(obj: ArcObject) -> BoundingBox:
@@ -168,15 +168,15 @@ class Rotate90Node(ASTNode):
     def evaluate(self, env): return rotate90(self.grid_node.evaluate(env))
     def __str__(self): return f"rotate90({self.grid_node})"
 
-class MirrorXNode(ASTNode):
+class FlipYNode(ASTNode):
     def __init__(self, grid_node): self.grid_node = grid_node
-    def evaluate(self, env): return mirror_x(self.grid_node.evaluate(env))
-    def __str__(self): return f"mirror_x({self.grid_node})"
+    def evaluate(self, env): return flip_y(self.grid_node.evaluate(env))
+    def __str__(self): return f"flip_y({self.grid_node})"
 
-class MirrorYNode(ASTNode):
+class FlipXNode(ASTNode):
     def __init__(self, grid_node): self.grid_node = grid_node
-    def evaluate(self, env): return mirror_y(self.grid_node.evaluate(env))
-    def __str__(self): return f"mirror_y({self.grid_node})"
+    def evaluate(self, env): return flip_x(self.grid_node.evaluate(env))
+    def __str__(self): return f"flip_x({self.grid_node})"
 
 class GetBoundingBoxNode(ASTNode):
     def __init__(self, obj_list_node): self.objs = obj_list_node
@@ -270,7 +270,7 @@ class MostCommonColorNode(ASTNode):
 import copy
 
 # Single-child Grid nodes that can be swapped with each other
-_UNARY_GRID_NODES = [Rotate90Node, MirrorXNode, MirrorYNode, TransposeNode, LargestObjectNode]
+_UNARY_GRID_NODES = [Rotate90Node, FlipYNode, FlipXNode, TransposeNode, LargestObjectNode]
 
 def mutate_program(program, grammar):
     """
@@ -360,12 +360,12 @@ class ARCGrammar(ActionGrammar):
     """
     Pillar 3: Abstraction & Composability.
     Provides the rules for generating nested functional expressions (Programs).
-    19 primitives: rotate, mirror_x/y, transpose, crop, paint, replace_color, pad, fill,
+    19 primitives: rotate, flip_y/y, transpose, crop, paint, replace_color, pad, fill,
     tile, overlay, scale_up, stack_v, stack_h, largest_object, count_color, most_common_color.
     """
     @property
     def primitives(self):
-        return [rotate90, mirror_x, mirror_y, transpose, get_objects, filter_by_color,
+        return [rotate90, flip_y, flip_x, transpose, get_objects, filter_by_color,
                 crop_to_box, paint_objects, replace_color, pad, fill_box, tile, overlay,
                 scale_up, stack_v, stack_h, largest_object, count_color, most_common_color]
         
@@ -380,8 +380,8 @@ class ARCGrammar(ActionGrammar):
             choices = [
                 lambda: IdentityGridNode(),
                 lambda: Rotate90Node(self._generate_typed_program('Grid', max_depth-1)),
-                lambda: MirrorXNode(self._generate_typed_program('Grid', max_depth-1)),
-                lambda: MirrorYNode(self._generate_typed_program('Grid', max_depth-1)),
+                lambda: FlipYNode(self._generate_typed_program('Grid', max_depth-1)),
+                lambda: FlipXNode(self._generate_typed_program('Grid', max_depth-1)),
                 lambda: TransposeNode(self._generate_typed_program('Grid', max_depth-1)),
                 lambda: CropToBoxNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Box', max_depth-1)),
                 lambda: ReplaceColorNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Color', max_depth-1), self._generate_typed_program('Color', max_depth-1)),

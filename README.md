@@ -26,12 +26,12 @@ A true solver must know if it is getting "warmer" or "colder" to combat combinat
 
 ### 3. Abstraction & Composability (`ActionGrammar`)
 Intelligence fundamentally operates on data compression and function composition. The core grammar dictates the discrete architectural building blocks (the "vocabulary") the agent is allowed to wield. 
-* **ARC:** 19 highly robust geometric primitives engineered into the DSL, such as `rotate90`, `mirror_x`, `crop_to_box`, `replace_color`, and `largest_object`.
+* **ARC:** 19 highly robust geometric primitives engineered into the DSL, such as `rotate90`, `flip_y`, `crop_to_box`, `replace_color`, and `largest_object`.
 * **Zork:** A lightweight symbolic Natural Language Parser (NLP) that maps conversational variations into heavily compressed semantic JSON representations (e.g. `{"action": "attack", "target": "troll", "tool": "sword"}`).
 
 ### 4. Exploration (`SearchAlgorithm`)
 Equipped with abstract primitives and a heuristic compass, the agent bravely traverses the infinite mathematical solution space.
-* **ARC:** An **Evolutionary Beam Search**. It maintains a population "beam" of the top 200 performing geometric abstractions. Across generations, it *mutates* these programs (e.g. swapping `mirror_x` with `rotate90`) and *crosses* over the best sub-trees organically progressing toward `loss = 0.0`. 
+* **ARC:** An **Evolutionary Beam Search**. It maintains a population "beam" of the top 200 performing geometric abstractions. Across generations, it *mutates* these programs (e.g. swapping `flip_y` with `rotate90`) and *crosses* over the best sub-trees organically progressing toward `loss = 0.0`. 
 * **Zork:** An **A* Best-First Search Graph Map**. By strictly byte-hashing game observations to actively deduplicate alternate timelines, the agent efficiently maps out complex dependency requirements (find lamp -> find key -> kill troll) via high-reward horizon scanning.
 
 ---
@@ -42,7 +42,7 @@ The absolute culmination of the project is the `UniversalSolver` and its **Wake-
 
 **How the cycle expands intelligence:**
 1. **Wake Phase:** The generalized solver is presented with tasks (e.g., solving ARC levels). It heavily utilizes its evolutionary beam search spanning its base vocabulary dictionary to organically form an architecture that achieves `loss = 0.0`.
-2. **Sleep Phase:** Taking a step back, the AGI evaluates all the programs it naturally solved during the day via *Library Learning*. It identifies mathematical intersections—recurring deep functional subtrees across distinct programs. It plucks these subtrees out, compresses them down into new, bespoke, named primitives (e.g. `learned_0 = mirror_x(rotate_90(input_grid))`), and permanently saves them to `library.json`.
+2. **Sleep Phase:** Taking a step back, the AGI evaluates all the programs it naturally solved during the day via *Library Learning*. It identifies mathematical intersections—recurring deep functional subtrees across distinct programs. It plucks these subtrees out, compresses them down into new, bespoke, named primitives (e.g. `learned_0 = flip_y(rotate_90(input_grid))`), and permanently saves them to `library.json`.
 
 With every iterative wake-sleep cycle round, the agent's logic ceiling compounds. Its base vocabulary scales from 19 functions to hundreds of complex domain abstractions, dramatically unlocking capabilities against impossibly difficult levels spanning far over the initial horizon.
 
@@ -117,7 +117,7 @@ python main.py benchmark --domain arc --trials 400 --beam-width 500 --max-gens 1
 ### The ~40% Ceiling: Wake-Sleep Library Learning
 The **~40% exact-match solution rate** is unlocked strictly when evaluating the `UniversalSolver` using its persistent **Wake-Sleep Library Learning** sequence across targeted sampling rounds. 
 
-By identifying recurring geometric subtrees during the "sleep" phase and permanently binding them into the dictionary (e.g., `learned_1 = mirror_x(rotate90(input_grid))`), the AGI fundamentally shrinks the combinatorial search horizon. As the library compounds over dozens of cycles, the solver bypasses the 10% combinatorics barrier and frequently solves up to 40% of small 10-20 task evaluation batches!
+By identifying recurring geometric subtrees during the "sleep" phase and permanently binding them into the dictionary (e.g., `learned_1 = flip_y(rotate90(input_grid))`), the AGI fundamentally shrinks the combinatorial search horizon. As the library compounds over dozens of cycles, the solver bypasses the 10% combinatorics barrier and frequently solves up to 40% of small 10-20 task evaluation batches!
 
 **Is this legit?**
 Yes, but comes with profound scientific caveats regarding AGI realities:
