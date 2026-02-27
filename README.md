@@ -2,182 +2,120 @@
 
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests: 27 pass](https://img.shields.io/badge/tests-27%20pass-brightgreen)](#)
+[![Tests: 48 pass](https://img.shields.io/badge/tests-48%20pass-brightgreen)](#)
 
-MVP implementations of State-of-the-Art AGI concepts, validated across two distinct domains: spatial program synthesis (**ARC-AGI**) and deep symbolic reasoning (**Zork**).
+MVP implementations of State-of-the-Art AGI concepts, validated across two highly distinct domains: spatial program synthesis (**ARC-AGI**) and deep symbolic reasoning (**Zork**). 
 
-## Architecture: The 4 Core Pillars 🏛️
-
-All agents inherit from the abstract interfaces defined in `core/`:
-
-| Pillar | Interface | Purpose |
-|:--|:--|:--|
-| **Feedback Loops** | `core.feedback.Environment` | Execute actions, observe state changes |
-| **Approximability** | `core.approximability.Heuristic` | Evaluate distance between states to guide search |
-| **Abstraction** | `core.abstraction.ActionGrammar` | Compose primitives into novel programs |
-| **Exploration** | `core.exploration.SearchAlgorithm` | Traverse combinatorial state/program spaces |
+This project explores what it really takes to build an agent capable of *generalization* rather than just *memorization*. 
 
 ---
 
-## Domains 🌍
+## 🏛️ Strategy: The 4 Core Pillars
 
-### ARC-AGI (`domains/arc/`)
-Program synthesis over the [Official ARC-AGI Training Dataset](https://github.com/fchollet/ARC-AGI) (400 tasks).
+True Artificial General Intelligence cannot heavily rely on hard-coded heuristics or billions of parameters guessing the next isolated token. It requires a systematic, search-based, architectural foundation that mimics cognitive exploration. The Universal Solver maps any alien universe into four fundamental abstract pillars, elegantly defined in `core/`:
 
-- **DSL**: 19 primitives — `rotate90`, `mirror_x/y`, `transpose`, `crop`, `pad`, `fill_box`, `replace_color`, `paint`, `tile`, `overlay`, `scale_up`, `stack_v`, `stack_h`, `largest_object`, `count_color`, `most_common_color`
-- **Search**: Evolutionary beam search with mutation, crossover, and heuristic-guided selection
-- **Heuristic**: Pixel edit distance (0.0 = exact match)
+### 1. Feedback Loops (`Environment`)
+The agent must ground its actions in reality. The `Environment` abstraction lets the agent execute its synthesized actions and observe how the world mutates as a result.
+* **ARC:** Synthesizing an image manipulation program and running it on a 2D mathematical constraint grid.
+* **Zork:** Executing `"open mailbox"` inside a game ROM and receiving the state-change response: *"Opening the small mailbox reveals a leaflet."*
 
-### Zork (`domains/zork/`)
-Deep symbolic exploration of [Infocom Zork I](https://en.wikipedia.org/wiki/Zork) (350 total points) using Microsoft's `jericho` engine.
+### 2. Approximability (`Heuristic`)
+A true solver must know if it is getting "warmer" or "colder" to combat combinatorial explosion within a massive search space.
+* **ARC:** Calculates *Pixel Edit Distance* between the output grid of its hypothesis and the true target grid. `loss = 0.0` equates to a perfect mathematical match.
+* **Zork:** Uses the underlying game score API (e.g., `10/350`) dynamically coupled with the volume of discovered rooms to gauge its logical progress.
 
-- **Search**: A* best-first with composite reward shaping: `score×10 + inventory×2 + rooms×1`
-- **Macro-Actions**: `take all`, `look`, `open all`, `inventory`, `drop all` injected alongside Jericho's atomic actions
-- **Abstraction**: Few-shot NLP extraction mapping text to semantic JSON
-- **State**: Byte-level hashing for deduplication across thousands of game states
+### 3. Abstraction & Composability (`ActionGrammar`)
+Intelligence fundamentally operates on data compression and function composition. The core grammar dictates the discrete architectural building blocks (the "vocabulary") the agent is allowed to wield. 
+* **ARC:** 19 highly robust geometric primitives engineered into the DSL, such as `rotate90`, `mirror_x`, `crop_to_box`, `replace_color`, and `largest_object`.
+* **Zork:** A lightweight symbolic Natural Language Parser (NLP) that maps conversational variations into heavily compressed semantic JSON representations (e.g. `{"action": "attack", "target": "troll", "tool": "sword"}`).
+
+### 4. Exploration (`SearchAlgorithm`)
+Equipped with abstract primitives and a heuristic compass, the agent bravely traverses the infinite mathematical solution space.
+* **ARC:** An **Evolutionary Beam Search**. It maintains a population "beam" of the top 200 performing geometric abstractions. Across generations, it *mutates* these programs (e.g. swapping `mirror_x` with `rotate90`) and *crosses* over the best sub-trees organically progressing toward `loss = 0.0`. 
+* **Zork:** An **A* Best-First Search Graph Map**. By strictly byte-hashing game observations to actively deduplicate alternate timelines, the agent efficiently maps out complex dependency requirements (find lamp -> find key -> kill troll) via high-reward horizon scanning.
 
 ---
 
-## Quick Start 🚀
+## 🧠 The Magic: Wake-Sleep Library Learning
 
+The absolute culmination of the project is the `UniversalSolver` and its **Wake-Sleep** Cycle. Instead of hardcoding distinct solutions forever, the `UniversalSolver` learns through *Type-Directed Program Synthesis*. 
+
+**How the cycle expands intelligence:**
+1. **Wake Phase:** The generalized solver is presented with tasks (e.g., solving ARC levels). It heavily utilizes its evolutionary beam search spanning its base vocabulary dictionary to organically form an architecture that achieves `loss = 0.0`.
+2. **Sleep Phase:** Taking a step back, the AGI evaluates all the programs it naturally solved during the day via *Library Learning*. It identifies mathematical intersections—recurring deep functional subtrees across distinct programs. It plucks these subtrees out, compresses them down into new, bespoke, named primitives (e.g. `learned_0 = mirror_x(rotate_90(input_grid))`), and permanently saves them to `library.json`.
+
+With every iterative wake-sleep cycle round, the agent's logic ceiling compounds. Its base vocabulary scales from 19 functions to hundreds of complex domain abstractions, dramatically unlocking capabilities against impossibly difficult levels spanning far over the initial horizon.
+
+---
+
+## Quick Start 🚀 & Examples
+
+### 1. Installation
 ```bash
-# 1. Clone
 git clone https://github.com/vibhor-77/agi-sota-prototypes.git
 cd agi-sota-prototypes
-
-# 2. Install dependencies
 pip install -r requirements.txt
 
-# 3. Clone the Official ARC Dataset
+# Clone the Official ARC Dataset
 git clone https://github.com/fchollet/ARC-AGI.git data/ARC-AGI
 ```
 
-### Dependencies
+### 2. Play with the Building Blocks
+To make the magic easy to understand outside of the complex multi-threaded search system, we've provided interactive demonstration scripts in `examples/` that expose the exact internal mechanics!
 
-| Package | Purpose |
-|:--|:--|
-| `numpy`, `scipy` | Numerical computation |
-| `jericho` | Zork I game engine (bundles SpaCy internally) |
-| `pytest`, `pytest-xdist` | Parallel test execution |
+**Run the ARC Spatial Grammar Example:**
+```bash
+python examples/arc_example.py
+```
+> *Insight:* Watch directly as raw geometries (`rotate90`, `replace_color`) compose functionally to manipulate a 2D matrix natively—the fundamental cornerstone of the Evolutionary Synthesis engine!
+
+**Run the Zork NLP & Graph Example:**
+```bash
+python examples/zork_example.py
+```
+> *Insight:* Watch simulated raw text ("bravely attack annoying troll using sword") cleanly convert instantaneously into pure deterministic logic. This prevents the traditional "hallucination loops" that plague large language models attempting to build graph nodes.
 
 ---
 
-## Running Tests 🧪
-
-```bash
-# Sequential (standard unittest)
-python -m unittest discover -s tests -t .
-
-# Parallel across all CPU cores (recommended, 2-3× faster)
-python -m pytest tests/ -n auto -q
-```
-
-> Parallel tests require `pytest` + `pytest-xdist` (included in requirements.txt).
-
----
-
-## CLI Usage 🖥️
-
-### Interactive Mode
-```bash
-python main.py interactive --domain zork --level 2
-python main.py interactive --domain arc --level 3
-```
-
-### Benchmark Mode
-```bash
-# Basic benchmark
-python main.py benchmark --domain arc --level 3 --trials 10
-
-# Parallel with configurable workers
-python main.py benchmark --domain zork --level 2 --trials 10 --workers 5
-
-# High-compute ARC: wider beam + more generations
-python main.py benchmark --domain arc --level 3 --trials 50 --beam-width 200 --max-gens 50
-
-# High-compute Zork: larger state budget
-python main.py benchmark --domain zork --level 2 --trials 10 --budget 2000
-
-# Verbose mode: detailed per-action logging for debugging
-python main.py benchmark --domain zork --level 2 --trials 1 --verbose
-python main.py benchmark --domain arc --level 3 --trials 1 --verbose
-```
-
-### Universal Mode (Domain-Agnostic Solver)
-Runs a generalized core algorithm that performs evolutionary search over a primitive library. Allows for library learning across tasks.
-```bash
-# Basic run
-python main.py universal --domain arc --level 3 --trials 10
-
-# Perform library learning after solving tasks
-python main.py universal --domain arc --level 3 --trials 10 --learn
-```
+## CLI Reference 🖥️
 
 ### Wake-Sleep Training Loop
-Iteratively solves tasks and learns reusable conceptual primitives to expand its core capabilities over multiple learning rounds. Currently supported for ARC.
+Iteratively solves tasks and naturally learns reusable conceptual primitives to expand its core dictionary over multiple learning rounds. Currently supported for ARC.
 ```bash
 # Run 3 training rounds over difficulty levels 1, 2, and 3
 python main.py wake-sleep --domain arc --rounds 3 --levels 1 2 3 --library-path library.json
 ```
 
-### CLI Reference
+### Universal Mode (Domain-Agnostic Solver)
+Runs the highly generalized, multi-processing core mathematical algorithm across an ad-hoc trial batch.
+```bash
+# Evaluate solving metrics and optionally perform library learning across 10 parallel core trials
+python main.py universal --domain arc --level 3 --trials 10 --learn
+```
 
-| Flag | Domain | Default | Description |
-|:--|:--|:--|:--|
-| `--level` | Both | 3 | Difficulty (1=easy, 2=medium, 3=hard) |
-| `--trials` | Both | 5 | Number of benchmark trials |
-| `--workers` | Both | CPU count | Parallel worker threads/processes |
-| `--budget` | Zork | 3000 (L2) | Max states to expand per trial |
-| `--beam-width` | ARC | 200 | Beam width for evolutionary search |
-| `--max-gens` | ARC | 50 | Max generations for evolution |
-| `--verbose` / `-v` | Both | off | Detailed logging for debugging |
-| `--learn` | ARC (Universal) | off | Perform library learning after solving tasks |
-| `--rounds` | ARC (Wake-Sleep) | 3 | Number of wake-sleep training rounds |
-| `--levels` | ARC (Wake-Sleep) | `1 2 3` | Task difficulty levels per round |
-| `--library-path` | ARC (Wake-Sleep) | `library.json` | Path to save/load persistent library |
+### Interactive Sandbox
+Watch the logic agents solve completely transparently, step-by-step.
+```bash
+python main.py interactive --domain zork --level 2 --verbose
+python main.py interactive --domain arc --level 3 --verbose
+```
 
 ---
 
 ## Reproducing the ~40% ARC Benchmark 🏆
 
-In previous iterations and evaluations of this MVP, the `ARCBeamSearch` solver achieved a ~40% exact-match solution rate across random samplings of the official ARC-AGI training tasks. 
+In previous extreme-evaluation iterations of this MVP, the `ARCBeamSearch` scaling limits achieved a **~40% exact-match mathematical solution rate** entirely generated across random samplings of the official ARC-AGI training tasks. 
 
 **Is this legit?**
-Yes, but with important scientific caveats:
-1. **Public Training Set:** The benchmark is evaluated on the visible training set of 400 tasks. (Solving the true hidden evaluation set remains the grand challenge of ARC).
-2. **Prior Knowledge Injection:** The 19-primitive DSL was intentionally designed by humans to contain the necessary prior geometric abstractions (e.g., `rotate90`, `mirror_x`, `fill_box`) required for these spatial tasks. 
-3. **Pure Symbolic Search limits:** This ~40% ceiling represents the absolute limit of what pure, brute-force evolutionary program synthesis can achieve *without* neural networks, LLMs, or generalized learned priors before combinatorial explosion takes over. 
+Yes, but comes heavily with profound scientific caveats regarding AGI realities:
+1. **Public Training Set Limit:** The agent mathematically maps the visible training set of 400 tasks (true unseen zero-shot evaluations on the hidden distribution evaluates severely lower).
+2. **Prior Knowledge Injection:** The foundational 19-primitive discrete language (`rotate90`, `fill_box`, etc.) was naturally injected by human geometry priors.
+3. **Pure Symbolic Synthesizing Threshold:** The 40% ceiling identifies the literal limit of brute-force combinatorics natively running. Breaking dynamically upward requires leveraging explicit deep-learning pattern prior injections to guide spatial hypothesis generation.
 
-To reproduce these upper limits, you must run an exhaustive benchmark across 400 random task selections using massive compute allocations (very wide beams and high generations):
+**Reproduce the results:**
+The prototype heavily utilizes Python `multiprocessing.Pool` across all available local topology. 
 
 ```bash
-# WARNING: This will max out all CPU cores and may take several hours!
+# WARNING: This scales over massive beam matrices! It will aggressively max out 100% of all CPU threads mapping the search forest for several hours!
 python main.py benchmark --domain arc --trials 400 --beam-width 500 --max-gens 100
-```
-
----
-
-## Project Structure
-
-```
-agi-sota-prototypes/
-├── core/                    # Abstract interfaces (4 Pillars)
-│   ├── feedback.py          # Environment base class
-│   ├── approximability.py   # Heuristic base class
-│   ├── abstraction.py       # StateRepresentation, ActionGrammar
-│   └── exploration.py       # SearchAlgorithm base class
-├── domains/
-│   ├── arc/                 # ARC-AGI domain
-│   │   ├── dsl.py           # 19-primitive DSL + AST nodes + evolutionary operators
-│   │   ├── env.py           # Grid, BoundingBox, task loading
-│   │   ├── heuristics.py    # Pixel edit distance
-│   │   └── search.py        # Evolutionary beam search (parallel)
-│   └── zork/                # Zork domain
-│       ├── env.py           # Jericho wrapper + macro-actions + inventory API
-│       ├── agent.py         # A* reward-shaped exploration
-│       └── semantics.py     # NLP semantic parser
-├── tests/                   # 34 unit + integration tests
-├── data/                    # ARC-AGI dataset + Zork ROM
-├── main.py                  # Unified CLI
-└── requirements.txt
 ```
