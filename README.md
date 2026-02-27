@@ -103,6 +103,23 @@ python main.py benchmark --domain zork --level 2 --trials 1 --verbose
 python main.py benchmark --domain arc --level 3 --trials 1 --verbose
 ```
 
+### Universal Mode (Domain-Agnostic Solver)
+Runs a generalized core algorithm that performs evolutionary search over a primitive library. Allows for library learning across tasks.
+```bash
+# Basic run
+python main.py universal --domain arc --level 3 --trials 10
+
+# Perform library learning after solving tasks
+python main.py universal --domain arc --level 3 --trials 10 --learn
+```
+
+### Wake-Sleep Training Loop
+Iteratively solves tasks and learns reusable conceptual primitives to expand its core capabilities over multiple learning rounds. Currently supported for ARC.
+```bash
+# Run 3 training rounds over difficulty levels 1, 2, and 3
+python main.py wake-sleep --domain arc --rounds 3 --levels 1 2 3 --library-path library.json
+```
+
 ### CLI Reference
 
 | Flag | Domain | Default | Description |
@@ -114,6 +131,10 @@ python main.py benchmark --domain arc --level 3 --trials 1 --verbose
 | `--beam-width` | ARC | 200 | Beam width for evolutionary search |
 | `--max-gens` | ARC | 50 | Max generations for evolution |
 | `--verbose` / `-v` | Both | off | Detailed logging for debugging |
+| `--learn` | ARC (Universal) | off | Perform library learning after solving tasks |
+| `--rounds` | ARC (Wake-Sleep) | 3 | Number of wake-sleep training rounds |
+| `--levels` | ARC (Wake-Sleep) | `1 2 3` | Task difficulty levels per round |
+| `--library-path` | ARC (Wake-Sleep) | `library.json` | Path to save/load persistent library |
 
 ---
 
