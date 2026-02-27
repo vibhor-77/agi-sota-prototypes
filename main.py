@@ -204,7 +204,7 @@ def _run_zork_trial(args):
 
 def _run_arc_trial(args):
     """Single ARC trial — must be top-level for ProcessPoolExecutor."""
-    level, beam_width, max_gens, verbose, trial_id, total_trials = args
+    level, beam_width, max_gens, verbose, trial_id, total_trials, completed_counter, success_counter, lock = args
     import time, sys, os
     train_ex, test_tests, task_id = generate_2d_arc_task(level=level, official_benchmark=True, return_id=True)
     test_ex = test_tests[0]
@@ -253,7 +253,16 @@ def _run_arc_trial(args):
                 diag = f"loss={final_loss:.4f}, shape {predicted.arr.shape} vs {test_ex[1].arr.shape}"
     
     status = "SUCCESS" if success else "FAILED"
-    print(f"  [FINISH] Trial {trial_id}/{total_trials} | {status} | Task: {task_id} | Time: {t1-t0:.2f}s")
+    
+    with lock:
+        completed_counter.value += 1
+        if success:
+            success_counter.value += 1
+        current_completed = completed_counter.value
+        current_successes = success_counter.value
+        
+    rate = (current_successes / current_completed) * 100
+    print(f"  [FINISH] Trial {trial_id}/{total_trials} | {status} | Task: {task_id} | Time: {t1-t0:.2f}s | Current Rate: {rate:.1f}% ({current_successes}/{current_completed})")
     sys.stdout.flush()
     return success, t1 - t0, ast_str, final_loss, diag
 
@@ -301,7 +310,12 @@ def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=
         print(f">>> {'VERBOSE ' if verbose else ''}EVALUATION (Beam: {bw}, Gens: {gens})")
         print(f">>> Processing {trials} trials across {min(workers, trials)} parallel workers...")
         
-        trial_args = [(level, bw, gens, verbose, i+1, trials) for i in range(trials)]
+        manager = multiprocessing.Manager()
+        completed_counter = manager.Value('i', 0)
+        success_counter = manager.Value('i', 0)
+        lock = manager.Lock()
+        
+        trial_args = [(level, bw, gens, verbose, i+1, trials, completed_counter, success_counter, lock) for i in range(trials)]
         effective_workers = min(workers, trials)
         with ProcessPoolExecutor(max_workers=effective_workers) as executor:
             results = list(executor.map(_run_arc_trial, trial_args))
