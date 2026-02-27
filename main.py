@@ -323,7 +323,81 @@ def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=
         print("===============")
 
 
+def run_universal(domain, level, trials, beam_width=None, max_gens=None,
+                  verbose=False, learn=False):
+    """Universal Solver mode — uses domain-agnostic algorithm with library learning."""
+    from core.solver import UniversalSolver
+    
+    bw = beam_width if beam_width is not None else 200
+    gens = max_gens if max_gens is not None else 50
+    
+    print(f"\n{'='*60}")
+    print(f" UNIVERSAL SOLVER | {domain.upper()} (Level {level}) | Trials: {trials}")
+    print(f" Beam: {bw} | Gens: {gens} | Learn: {learn}")
+    print(f"{'='*60}\n")
+    
+    if domain == "arc":
+        from domains.arc.adapter import create_arc_library, make_arc_eval_fn
+        from domains.arc.env import ARCEnvironment
+        
+        library = create_arc_library()
+        solver = UniversalSolver(library)
+        
+        success_count = 0
+        total_time = 0.0
+        
+        for i in range(trials):
+            train_ex, test_tests = generate_2d_arc_task(level=level, official_benchmark=True)
+            test_ex = test_tests[0]
+            eval_fn = make_arc_eval_fn(train_ex)
+            
+            t0 = time.time()
+            best_prog, best_loss = solver.solve(
+                eval_fn, output_type='Grid',
+                beam_width=bw, max_generations=gens, verbose=verbose
+            )
+            elapsed = time.time() - t0
+            total_time += elapsed
+            
+            # Test against held-out test set
+            success = False
+            if best_loss == 0.0:
+                try:
+                    test_pred = best_prog.execute({'input_grid': test_ex[0]})
+                    if test_pred is not None and hasattr(test_pred, 'arr'):
+                        import numpy as np
+                        success = np.array_equal(test_pred.arr, test_ex[1].arr)
+                except Exception:
+                    pass
+            
+            if success:
+                success_count += 1
+                print(f"Trial {i+1}/{trials} | SUCCESS | {elapsed:.1f}s | {best_prog}")
+            else:
+                print(f"Trial {i+1}/{trials} | FAILED  | {elapsed:.1f}s | loss={best_loss:.4f}")
+        
+        print(f"\n{'='*30} RESULTS {'='*30}")
+        print(f"Success Rate: {success_count}/{trials} ({100*success_count/trials:.1f}%)")
+        print(f"Avg Time: {total_time/trials:.1f}s/trial")
+        print(f"Library: {len(library.primitives)} primitives")
+        
+        # Library Learning
+        if learn:
+            new_prims = solver.learn(verbose=True)
+            if new_prims:
+                print(f"\n[LEARN] Library grew: +{len(new_prims)} primitives")
+                print(library.summary())
+        
+        print("=" * 69)
+    
+    elif domain == "zork":
+        print("[UNIVERSAL] Zork universal mode uses the domain-specific A* agent")
+        print("[UNIVERSAL] (Zork's state-based exploration doesn't map to program synthesis)")
+        print("[UNIVERSAL] Use: python main.py benchmark --domain zork --level 2")
+
+
 if __name__ == "__main__":
+
     import multiprocessing
     
     parser = argparse.ArgumentParser(
@@ -334,10 +408,11 @@ if __name__ == "__main__":
   python main.py interactive --domain arc --level 3 --verbose
   python main.py benchmark --domain arc --level 3 --trials 20 --workers 5
   python main.py benchmark --domain zork --level 2 --trials 10 --budget 2000
-  python main.py benchmark --domain arc --level 3 --trials 5 --beam-width 200 --max-gens 50
-  python main.py benchmark --domain zork --level 2 --trials 1 --verbose
+  python main.py universal --domain arc --level 3 --trials 10 --learn
+  python main.py universal --domain arc --level 3 --trials 5 --verbose
 """)
-    parser.add_argument("mode", choices=["interactive", "benchmark"], help="Execution mode")
+    parser.add_argument("mode", choices=["interactive", "benchmark", "universal"],
+                        help="Execution mode (universal = domain-agnostic solver)")
     parser.add_argument("--domain", choices=["arc", "zork"], required=True, help="Domain to run")
     parser.add_argument("--level", type=int, choices=[1, 2, 3], default=3, help="Difficulty level (1-3)")
     parser.add_argument("--trials", type=int, default=5, help="Number of trials for benchmark mode")
@@ -351,6 +426,8 @@ if __name__ == "__main__":
                         help="ARC: max generations for evolutionary search (default: 50)")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Enable detailed logging (room discovery, inventory, per-gen stats)")
+    parser.add_argument("--learn", action="store_true",
+                        help="Universal mode: perform library learning after solving tasks")
     
     args = parser.parse_args()
     
@@ -364,3 +441,7 @@ if __name__ == "__main__":
                        workers=args.workers, budget=args.budget,
                        beam_width=args.beam_width, max_gens=args.max_gens,
                        verbose=args.verbose)
+    elif args.mode == "universal":
+        run_universal(args.domain, args.level, args.trials,
+                      beam_width=args.beam_width, max_gens=args.max_gens,
+                      verbose=args.verbose, learn=args.learn)
