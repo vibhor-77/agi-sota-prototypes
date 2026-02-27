@@ -110,7 +110,7 @@ def run_arc_interactive(level, verbose=False):
     agent = ARCBeamSearch()
     
     t0 = time.time()
-    best_program = agent.search(train_ex, target=None, beam_width=100, max_generations=30, verbose=verbose)
+    best_program = agent.search(train_ex, target=None, beam_width=200, max_generations=50, verbose=verbose)
     t1 = time.time()
     
     print("\n==================================================")
@@ -267,7 +267,7 @@ def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=
         search_type = "BFS" if level == 1 else "A* Best-First"
         depth = 5 if level == 1 else (15 if level == 2 else 25)
         if budget is None:
-            budget = 2000 if level == 1 else (1000 if level == 2 else 2000)
+            budget = 2000 if level == 1 else (3000 if level == 2 else 5000)
         print(f">>> {'VERBOSE ' if verbose else ''}EVALUATION ({search_type}, Depth: {depth}, Budget: {budget})")
         
         trial_args = [(level, depth, budget, verbose)] * trials
@@ -291,8 +291,8 @@ def run_benchmarks(domain, level, trials, workers=None, budget=None, beam_width=
         print("===============")
         
     elif domain == "arc":
-        bw = beam_width if beam_width else 100
-        gens = max_gens if max_gens else 30
+        bw = beam_width if beam_width is not None else 200
+        gens = max_gens if max_gens is not None else 50
         print(f">>> {'VERBOSE ' if verbose else ''}EVALUATION (Beam: {bw}, Gens: {gens})")
         
         trial_args = [(level, bw, gens, verbose)] * trials
@@ -344,11 +344,11 @@ if __name__ == "__main__":
     parser.add_argument("--workers", type=int, default=multiprocessing.cpu_count(),
                         help=f"Parallel workers (default: {multiprocessing.cpu_count()} = auto-detected CPUs)")
     parser.add_argument("--budget", type=int, default=None,
-                        help="Zork: max states to expand per trial (default: 1000 for L2, 2000 for L3)")
+                        help="Zork: max states to expand per trial (default: 3000 for L2, 5000 for L3)")
     parser.add_argument("--beam-width", type=int, default=None, dest="beam_width",
-                        help="ARC: beam width for evolutionary search (default: 100)")
+                        help="ARC: beam width for evolutionary search (default: 200)")
     parser.add_argument("--max-gens", type=int, default=None, dest="max_gens",
-                        help="ARC: max generations for evolutionary search (default: 30)")
+                        help="ARC: max generations for evolutionary search (default: 50)")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Enable detailed logging (room discovery, inventory, per-gen stats)")
     

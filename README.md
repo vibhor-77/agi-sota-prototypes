@@ -110,9 +110,9 @@ python main.py benchmark --domain arc --level 3 --trials 1 --verbose
 | `--level` | Both | 3 | Difficulty (1=easy, 2=medium, 3=hard) |
 | `--trials` | Both | 5 | Number of benchmark trials |
 | `--workers` | Both | CPU count | Parallel worker threads/processes |
-| `--budget` | Zork | 1000 (L2) | Max states to expand per trial |
-| `--beam-width` | ARC | 100 | Beam width for evolutionary search |
-| `--max-gens` | ARC | 30 | Max generations for evolution |
+| `--budget` | Zork | 3000 (L2) | Max states to expand per trial |
+| `--beam-width` | ARC | 200 | Beam width for evolutionary search |
+| `--max-gens` | ARC | 50 | Max generations for evolution |
 | `--verbose` / `-v` | Both | off | Detailed logging for debugging |
 
 ---
