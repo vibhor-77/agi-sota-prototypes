@@ -35,9 +35,18 @@ class ZorkSOTAEnvironment(Environment):
     def load_state(self, state):
         self.env.set_state(state)
         
+    # Common macro-actions that help the agent skip tedious sub-sequences
+    MACRO_ACTIONS = ['take all', 'look', 'open all', 'inventory', 'drop all']
+    
     def get_valid_actions(self):
-        # Disable parallel validation to prevent leaking multiprocessing pools (improves stability on Mac/Python 3.9)
-        return self.env.get_valid_actions(use_parallel=False)
+        # Get Jericho's atomic actions + inject macro-actions
+        jericho_actions = self.env.get_valid_actions(use_parallel=False)
+        # Add macro-actions that aren't already present
+        combined = list(jericho_actions)
+        for macro in self.MACRO_ACTIONS:
+            if macro not in combined:
+                combined.append(macro)
+        return combined
 
     def get_inventory(self):
         """Returns list of items currently held by the player."""

@@ -24,7 +24,7 @@ All agents inherit from the abstract interfaces defined in `core/`:
 ### ARC-AGI (`domains/arc/`)
 Program synthesis over the [Official ARC-AGI Training Dataset](https://github.com/fchollet/ARC-AGI) (400 tasks).
 
-- **DSL**: 13 primitives — `rotate90`, `mirror_x/y`, `transpose`, `crop`, `pad`, `fill_box`, `replace_color`, `paint`, `tile`, `overlay`
+- **DSL**: 19 primitives — `rotate90`, `mirror_x/y`, `transpose`, `crop`, `pad`, `fill_box`, `replace_color`, `paint`, `tile`, `overlay`, `scale_up`, `stack_v`, `stack_h`, `largest_object`, `count_color`, `most_common_color`
 - **Search**: Evolutionary beam search with mutation, crossover, and heuristic-guided selection
 - **Heuristic**: Pixel edit distance (0.0 = exact match)
 
@@ -32,6 +32,7 @@ Program synthesis over the [Official ARC-AGI Training Dataset](https://github.co
 Deep symbolic exploration of [Infocom Zork I](https://en.wikipedia.org/wiki/Zork) (350 total points) using Microsoft's `jericho` engine.
 
 - **Search**: A* best-first with composite reward shaping: `score×10 + inventory×2 + rooms×1`
+- **Macro-Actions**: `take all`, `look`, `open all`, `inventory`, `drop all` injected alongside Jericho's atomic actions
 - **Abstraction**: Few-shot NLP extraction mapping text to semantic JSON
 - **State**: Byte-level hashing for deduplication across thousands of game states
 
@@ -127,15 +128,15 @@ agi-sota-prototypes/
 │   └── exploration.py       # SearchAlgorithm base class
 ├── domains/
 │   ├── arc/                 # ARC-AGI domain
-│   │   ├── dsl.py           # 13-primitive DSL + AST nodes + evolutionary operators
+│   │   ├── dsl.py           # 19-primitive DSL + AST nodes + evolutionary operators
 │   │   ├── env.py           # Grid, BoundingBox, task loading
 │   │   ├── heuristics.py    # Pixel edit distance
 │   │   └── search.py        # Evolutionary beam search (parallel)
 │   └── zork/                # Zork domain
-│       ├── env.py           # Jericho wrapper + inventory API
+│       ├── env.py           # Jericho wrapper + macro-actions + inventory API
 │       ├── agent.py         # A* reward-shaped exploration
 │       └── semantics.py     # NLP semantic parser
-├── tests/                   # 27 unit + integration tests
+├── tests/                   # 34 unit + integration tests
 ├── data/                    # ARC-AGI dataset + Zork ROM
 ├── main.py                  # Unified CLI
 └── requirements.txt

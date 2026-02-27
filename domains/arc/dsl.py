@@ -83,6 +83,50 @@ def overlay(base: Grid, top: Grid) -> Grid:
     b[mask] = t[mask]
     return Grid(b)
 
+def count_color(grid: Grid, color: int) -> int:
+    """Count pixels of a specific color."""
+    return int(np.sum(grid.arr == color))
+
+def most_common_color(grid: Grid) -> int:
+    """Return the most common non-zero color in the grid."""
+    flat = grid.arr.flatten()
+    non_zero = flat[flat != 0]
+    if len(non_zero) == 0:
+        return 0
+    values, counts = np.unique(non_zero, return_counts=True)
+    return int(values[np.argmax(counts)])
+
+def scale_up(grid: Grid, factor: int) -> Grid:
+    """Scale grid by repeating each pixel factor×factor."""
+    factor = max(1, min(factor, 5))  # Clamp to [1, 5]
+    return Grid(np.repeat(np.repeat(grid.arr, factor, axis=0), factor, axis=1))
+
+def stack_v(top: Grid, bottom: Grid) -> Grid:
+    """Stack two grids vertically. Pads narrower grid with zeros."""
+    max_c = max(top.arr.shape[1], bottom.arr.shape[1])
+    t = np.pad(top.arr, ((0, 0), (0, max_c - top.arr.shape[1])), constant_values=0)
+    b = np.pad(bottom.arr, ((0, 0), (0, max_c - bottom.arr.shape[1])), constant_values=0)
+    return Grid(np.vstack([t, b]))
+
+def stack_h(left: Grid, right: Grid) -> Grid:
+    """Stack two grids horizontally. Pads shorter grid with zeros."""
+    max_r = max(left.arr.shape[0], right.arr.shape[0])
+    l = np.pad(left.arr, ((0, max_r - left.arr.shape[0]), (0, 0)), constant_values=0)
+    r = np.pad(right.arr, ((0, max_r - right.arr.shape[0]), (0, 0)), constant_values=0)
+    return Grid(np.hstack([l, r]))
+
+def largest_object(grid: Grid) -> Grid:
+    """Extract the largest connected non-zero component as a cropped grid."""
+    objs = get_objects(grid)
+    if not objs:
+        return grid
+    biggest = max(objs, key=lambda o: int(np.sum(o.mask)))
+    rows, cols = np.where(biggest.mask)
+    if len(rows) == 0:
+        return grid
+    cropped = grid.arr[np.min(rows):np.max(rows)+1, np.min(cols):np.max(cols)+1].copy()
+    return Grid(cropped)
+
 # --- Abstract Syntax Tree (Composability) ---
 class ASTNode:
     def evaluate(self, env): pass
@@ -188,11 +232,45 @@ class OverlayNode(ASTNode):
     def evaluate(self, env): return overlay(self.base.evaluate(env), self.top.evaluate(env))
     def __str__(self): return f"overlay({self.base}, {self.top})"
 
+class ScaleUpNode(ASTNode):
+    def __init__(self, grid_node, factor_node):
+        self.grid, self.factor = grid_node, factor_node
+    def evaluate(self, env): return scale_up(self.grid.evaluate(env), self.factor.evaluate(env))
+    def __str__(self): return f"scale_up({self.grid}, {self.factor})"
+
+class StackVNode(ASTNode):
+    def __init__(self, top_node, bottom_node):
+        self.top_g, self.bottom_g = top_node, bottom_node
+    def evaluate(self, env): return stack_v(self.top_g.evaluate(env), self.bottom_g.evaluate(env))
+    def __str__(self): return f"stack_v({self.top_g}, {self.bottom_g})"
+
+class StackHNode(ASTNode):
+    def __init__(self, left_node, right_node):
+        self.left_g, self.right_g = left_node, right_node
+    def evaluate(self, env): return stack_h(self.left_g.evaluate(env), self.right_g.evaluate(env))
+    def __str__(self): return f"stack_h({self.left_g}, {self.right_g})"
+
+class LargestObjectNode(ASTNode):
+    def __init__(self, grid_node): self.grid_node = grid_node
+    def evaluate(self, env): return largest_object(self.grid_node.evaluate(env))
+    def __str__(self): return f"largest_object({self.grid_node})"
+
+class CountColorNode(ASTNode):
+    def __init__(self, grid_node, color_node):
+        self.grid, self.col = grid_node, color_node
+    def evaluate(self, env): return count_color(self.grid.evaluate(env), self.col.evaluate(env))
+    def __str__(self): return f"count_color({self.grid}, {self.col})"
+
+class MostCommonColorNode(ASTNode):
+    def __init__(self, grid_node): self.grid_node = grid_node
+    def evaluate(self, env): return most_common_color(self.grid_node.evaluate(env))
+    def __str__(self): return f"most_common_color({self.grid_node})"
+
 # --- Evolutionary Operators ---
 import copy
 
 # Single-child Grid nodes that can be swapped with each other
-_UNARY_GRID_NODES = [Rotate90Node, MirrorXNode, MirrorYNode, TransposeNode]
+_UNARY_GRID_NODES = [Rotate90Node, MirrorXNode, MirrorYNode, TransposeNode, LargestObjectNode]
 
 def mutate_program(program, grammar):
     """
@@ -253,12 +331,14 @@ class ARCGrammar(ActionGrammar):
     """
     Pillar 3: Abstraction & Composability.
     Provides the rules for generating nested functional expressions (Programs).
-    13 primitives: rotate, mirror_x/y, transpose, crop, paint, replace_color, pad, fill, tile, overlay.
+    19 primitives: rotate, mirror_x/y, transpose, crop, paint, replace_color, pad, fill,
+    tile, overlay, scale_up, stack_v, stack_h, largest_object, count_color, most_common_color.
     """
     @property
     def primitives(self):
         return [rotate90, mirror_x, mirror_y, transpose, get_objects, filter_by_color,
-                crop_to_box, paint_objects, replace_color, pad, fill_box, tile, overlay]
+                crop_to_box, paint_objects, replace_color, pad, fill_box, tile, overlay,
+                scale_up, stack_v, stack_h, largest_object, count_color, most_common_color]
         
     def compose(self, return_type, max_depth=3):
         return self._generate_typed_program(return_type, max_depth)
@@ -267,26 +347,34 @@ class ARCGrammar(ActionGrammar):
         if return_type == 'Grid':
             if max_depth <= 1:
                 return IdentityGridNode()
-            # 13 grid-producing options with ~equal weight
-            r = random.random()
-            if r < 0.08: return IdentityGridNode()
-            elif r < 0.16: return Rotate90Node(self._generate_typed_program('Grid', max_depth-1))
-            elif r < 0.24: return MirrorXNode(self._generate_typed_program('Grid', max_depth-1))
-            elif r < 0.32: return MirrorYNode(self._generate_typed_program('Grid', max_depth-1))
-            elif r < 0.40: return TransposeNode(self._generate_typed_program('Grid', max_depth-1))
-            elif r < 0.48: return CropToBoxNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Box', max_depth-1))
-            elif r < 0.56: return ReplaceColorNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Color', max_depth-1), self._generate_typed_program('Color', max_depth-1))
-            elif r < 0.64: return PadNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Int', max_depth-1), self._generate_typed_program('Color', max_depth-1))
-            elif r < 0.72: return FillBoxNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Box', max_depth-1), self._generate_typed_program('Color', max_depth-1))
-            elif r < 0.80: return TileNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Int', max_depth-1), self._generate_typed_program('Int', max_depth-1))
-            elif r < 0.88: return OverlayNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Grid', max_depth-1))
-            else: return PaintNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('ObjectList', max_depth-1), self._generate_typed_program('Color', max_depth-1))
+            # 19 grid-producing options
+            choices = [
+                lambda: IdentityGridNode(),
+                lambda: Rotate90Node(self._generate_typed_program('Grid', max_depth-1)),
+                lambda: MirrorXNode(self._generate_typed_program('Grid', max_depth-1)),
+                lambda: MirrorYNode(self._generate_typed_program('Grid', max_depth-1)),
+                lambda: TransposeNode(self._generate_typed_program('Grid', max_depth-1)),
+                lambda: CropToBoxNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Box', max_depth-1)),
+                lambda: ReplaceColorNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Color', max_depth-1), self._generate_typed_program('Color', max_depth-1)),
+                lambda: PadNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Int', max_depth-1), self._generate_typed_program('Color', max_depth-1)),
+                lambda: FillBoxNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Box', max_depth-1), self._generate_typed_program('Color', max_depth-1)),
+                lambda: TileNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Int', max_depth-1), self._generate_typed_program('Int', max_depth-1)),
+                lambda: OverlayNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Grid', max_depth-1)),
+                lambda: PaintNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('ObjectList', max_depth-1), self._generate_typed_program('Color', max_depth-1)),
+                lambda: ScaleUpNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Int', max_depth-1)),
+                lambda: StackVNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Grid', max_depth-1)),
+                lambda: StackHNode(self._generate_typed_program('Grid', max_depth-1), self._generate_typed_program('Grid', max_depth-1)),
+                lambda: LargestObjectNode(self._generate_typed_program('Grid', max_depth-1)),
+            ]
+            return random.choice(choices)()
         elif return_type == 'ObjectList':
             if max_depth <= 1 or random.random() < 0.5:
                 return GetObjectsNode(self._generate_typed_program('Grid', max_depth-1))
             else:
                 return FilterColorNode(self._generate_typed_program('ObjectList', max_depth-1), self._generate_typed_program('Color', max_depth-1))
         elif return_type == 'Color':
+            if max_depth > 1 and random.random() < 0.15:
+                return MostCommonColorNode(self._generate_typed_program('Grid', max_depth-1))
             return ColorNode(random.choice([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]))
         elif return_type == 'Box':
             return GetBoundingBoxNode(self._generate_typed_program('ObjectList', max_depth-1))
